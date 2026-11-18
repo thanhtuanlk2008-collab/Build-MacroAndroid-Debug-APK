@@ -294,8 +294,27 @@ class FloatingControlService : LifecycleService() {
                                 "Hãy bật MacroAndroid trong Cài đặt Trợ năng để sử dụng Tap.",
                                 Toast.LENGTH_SHORT
                             ).show()
-                        } else if (!accessibility.dispatchTapAt(tapX, tapY)) {
-                            Toast.makeText(this, "Android không chấp nhận thao tác chạm.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            // Make only the small bubble window pass-through while the
+                            // synthetic tap is delivered to the app beneath it.
+                            val currentParams = controlParams
+                            if (currentParams != null) {
+                                currentParams.flags = currentParams.flags or
+                                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                                runCatching { windowManager.updateViewLayout(controlView, currentParams) }
+                            }
+                            val restoreBubble = {
+                                if (currentParams != null) {
+                                    currentParams.flags = currentParams.flags and
+                                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                                    runCatching { windowManager.updateViewLayout(controlView, currentParams) }
+                                }
+                            }
+                            val accepted = accessibility.dispatchTapAt(tapX, tapY, restoreBubble)
+                            if (!accepted) {
+                                restoreBubble()
+                                Toast.makeText(this, "Android không chấp nhận thao tác chạm.", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                     lifecycleScope.launch {

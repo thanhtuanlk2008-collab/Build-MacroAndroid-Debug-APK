@@ -12,18 +12,27 @@ import android.os.Process
  * any MotionEvent until the target device's permission and concurrency
  * behavior have been separately validated.
  */
-class ShizukuInputProbeService(
-    private val serviceContext: Context
+class ShizukuInputProbeService @JvmOverloads constructor(
+    serviceContext: Context? = null
 ) : IShizukuInputProbe.Stub() {
+
+    private val probeContext: Context? = serviceContext ?: resolveApplicationContext()
 
     override fun getProcessUid(): Int = Process.myUid()
 
     override fun getProcessPid(): Int = Process.myPid()
 
-    override fun hasInjectEventsPermission(): Boolean =
-        serviceContext.checkPermission(
+    override fun hasInjectEventsPermission(): Boolean {
+        val context = probeContext ?: return false
+        return context.checkPermission(
             "android.permission.INJECT_EVENTS",
             Process.myPid(),
             Process.myUid()
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun resolveApplicationContext(): Context? = runCatching {
+        val activityThread = Class.forName("android.app.ActivityThread")
+        activityThread.getMethod("currentApplication").invoke(null) as? Context
+    }.getOrNull()
 }

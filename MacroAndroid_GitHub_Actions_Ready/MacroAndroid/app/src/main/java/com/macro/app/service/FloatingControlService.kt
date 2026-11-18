@@ -301,13 +301,17 @@ class FloatingControlService : LifecycleService() {
                             if (currentParams != null) {
                                 currentParams.flags = currentParams.flags or
                                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                                runCatching { windowManager.updateViewLayout(controlView, currentParams) }
+                                controlView?.let { view ->
+                                    runCatching { windowManager.updateViewLayout(view, currentParams) }
+                                }
                             }
                             val restoreBubble = {
                                 if (currentParams != null) {
                                     currentParams.flags = currentParams.flags and
                                         WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-                                    runCatching { windowManager.updateViewLayout(controlView, currentParams) }
+                                    controlView?.let { view ->
+                                        runCatching { windowManager.updateViewLayout(view, currentParams) }
+                                    }
                                 }
                             }
                             val accepted = accessibility.dispatchTapAt(tapX, tapY, restoreBubble)

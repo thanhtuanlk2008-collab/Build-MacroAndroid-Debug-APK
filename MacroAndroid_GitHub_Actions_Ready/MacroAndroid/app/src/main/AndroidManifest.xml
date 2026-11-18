@@ -57,6 +57,15 @@
                 android:value="Floating gaming macro control overlay and playback status indicator" />
         </service>
 
+        <!-- Shizuku API bootstrap provider -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
     </application>
 
 </manifest>

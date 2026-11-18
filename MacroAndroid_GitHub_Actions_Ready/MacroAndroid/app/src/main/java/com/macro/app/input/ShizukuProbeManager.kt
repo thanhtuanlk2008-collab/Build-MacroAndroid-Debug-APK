@@ -160,7 +160,7 @@ object ShizukuProbeManager {
 
     @Synchronized
     private fun bindProbeService() {
-        val context = appContext ?: run {
+        if (appContext == null) {
             mutableStatus.value = "Shizuku probe chưa được khởi tạo."
             return
         }

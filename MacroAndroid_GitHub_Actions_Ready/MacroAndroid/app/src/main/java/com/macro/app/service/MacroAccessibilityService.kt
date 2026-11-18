@@ -62,6 +62,21 @@ class MacroAccessibilityService : AccessibilityService() {
     }
 
     /**
+     * Inject one short tap at screen coordinates after the floating button is released.
+     * This does not install a full-screen touch-capture window.
+     */
+    fun dispatchTapAt(screenX: Float, screenY: Float): Boolean {
+        val path = Path().apply {
+            moveTo(screenX, screenY)
+            lineTo(screenX + 1f, screenY + 1f)
+        }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0L, 55L))
+            .build()
+        return runCatching { dispatchGesture(gesture, null, null) }.getOrDefault(false)
+    }
+
+    /**
      * Displays a transparent touch-capture layer over the foreground app.
      * Captured single-finger gestures are recorded and replayed to the app below
      * using AccessibilityService.dispatchGesture().

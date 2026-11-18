@@ -314,6 +314,7 @@ class FloatingControlService : LifecycleService() {
             if (MacroEngine.recorder.recorderState.value != MacroState.IDLE) {
                 MacroEngine.recorder.cancelRecording()
                 hideTargetPin()
+                MacroAccessibilityService.instance?.stopTouchRecordingOverlay()
             }
         }
 
@@ -331,11 +332,10 @@ class FloatingControlService : LifecycleService() {
             setPadding(0, dp(6), 0, 0)
             visibility = View.GONE
         }
-        recRow.addView(makeActionBtn("+ TAP", "#0D47A1") { capturePinTap(false) })
-        recRow.addView(space(4))
-        recRow.addView(makeActionBtn("+ HOLD", "#4A148C") { capturePinTap(true) })
-        recRow.addView(space(4))
-        recRow.addView(makeActionBtn("LƯU", "#2E7D32") { finishAndSaveRecording() })
+        recRow.addView(makeActionBtn("LƯU", "#2E7D32") {
+            MacroAccessibilityService.instance?.finishTouchRecordingAndSave()
+                ?: Toast.makeText(this, "Accessibility Service chưa sẵn sàng.", Toast.LENGTH_SHORT).show()
+        })
         recControlsRow = recRow
         panel.addView(recRow)
 
@@ -513,10 +513,18 @@ class FloatingControlService : LifecycleService() {
     private fun handleRecClick() {
         when (MacroEngine.recorder.recorderState.value) {
             MacroState.IDLE, MacroState.STOPPED -> {
-                MacroEngine.emergencyStop()
-                MacroEngine.recorder.startRecording()
-                showTargetPin()
-                Toast.makeText(this, "Kéo tâm ngắm ⊕ vào nút game và bấm + TAP / + HOLD", Toast.LENGTH_SHORT).show()
+                val accessibility = MacroAccessibilityService.instance
+                if (accessibility == null) {
+                    Toast.makeText(
+                        this,
+                        "Hãy bật MacroAndroid trong Cài đặt Trợ năng trước.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    return
+                }
+                if (!accessibility.startTouchRecordingOverlay()) {
+                    Toast.makeText(this, "Không thể khởi động Touch Recording.", Toast.LENGTH_LONG).show()
+                }
             }
             MacroState.RECORDING -> {
                 MacroEngine.recorder.pauseRecording()

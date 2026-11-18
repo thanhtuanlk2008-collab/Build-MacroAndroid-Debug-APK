@@ -1,0 +1,66 @@
+name: Build MacroAndroid Debug APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Tải mã nguồn từ repository
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      # 2. Cài đặt Java 17
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # 3. Cài đặt Android SDK
+      - name: Setup Android SDK
+        run: |
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found"
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses || true
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      # 4. Cài đặt Gradle 8.10.2
+      - name: Setup Gradle 8.10.2
+        run: |
+          curl -L https://services.gradle.org/distributions/gradle-8.10.2-bin.zip -o gradle.zip
+          unzip -q gradle.zip -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.10.2/bin" >> "$GITHUB_PATH"
+
+      # 5. Giải nén mã nguồn
+      - name: Extract MacroAndroid
+        run: unzip -q MacroAndroid_GitHub_Actions_Fixed.zip
+
+      # 6. Biên dịch APK
+      - name: Build Debug APK
+        working-directory: MacroAndroid
+        run: gradle assembleDebug --stacktrace
+
+      # 7. Đưa APK lên GitHub Actions
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MacroAndroid-debug-apk
+          path: MacroAndroid/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7

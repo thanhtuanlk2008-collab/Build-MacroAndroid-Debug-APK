@@ -47,6 +47,8 @@ import com.macro.app.ui.theme.GamingColors
 @Composable
 fun TestingDashboardScreen(
     isAccessibilityConnected: Boolean,
+    shizukuProbeStatus: String,
+    onProbeShizuku: () -> Unit,
     floatingActive: Boolean,
     telemetry: PlaybackTelemetry,
     currentSpeed: Float,
@@ -102,6 +104,39 @@ fun TestingDashboardScreen(
                             color = GamingColors.CrimsonRed
                         )
                     }
+                }
+            }
+        }
+
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = GamingColors.CarbonSurface),
+                border = BorderStroke(1.dp, GamingColors.CyberBlue.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "SHIZUKU INPUT BACKEND — KIỂM TRA QUYỀN",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = GamingColors.CyberBlue
+                    )
+                    Text(
+                        text = "Kiểm tra UID và quyền INJECT_EVENTS ngay trong tiến trình UserService. Bước này chỉ chẩn đoán, không gửi thao tác chạm.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GamingColors.TextSecondary
+                    )
+                    OutlinedButton(onClick = onProbeShizuku) {
+                        Text("Kiểm tra Shizuku")
+                    }
+                    Text(
+                        text = shizukuProbeStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GamingColors.TextPrimary
+                    )
                 }
             }
         }

@@ -7,6 +7,7 @@ import com.macro.app.MacroApplication
 import com.macro.app.engine.MacroEngine
 import com.macro.app.engine.PlaybackTelemetry
 import com.macro.app.engine.SpeedEngine
+import com.macro.app.input.ShizukuProbeManager
 import com.macro.app.model.GameCategory
 import com.macro.app.model.Macro
 import com.macro.app.model.MacroSettings
@@ -36,6 +37,7 @@ class MacroViewModel(application: Application) : AndroidViewModel(application) {
         ?: MutableStateFlow(PlaybackTelemetry())
 
     val speedMultiplier: StateFlow<Float> = SpeedEngine.speedMultiplier
+    val shizukuProbeStatus: StateFlow<String> = ShizukuProbeManager.status
     val instantMode: StateFlow<Boolean> = SpeedEngine.instantMode
     val isAccessibilityConnected: StateFlow<Boolean> = MacroEngine.isAccessibilityConnected
     val selectedMacro: StateFlow<Macro?> = MacroEngine.selectedMacro
@@ -48,6 +50,8 @@ class MacroViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _floatingActive = MutableStateFlow(FloatingControlService.isRunning)
     val floatingActive: StateFlow<Boolean> = _floatingActive.asStateFlow()
+
+    fun probeShizuku() = ShizukuProbeManager.probe(getApplication())
 
     fun refreshStatus() {
         val ctx = getApplication<Application>()

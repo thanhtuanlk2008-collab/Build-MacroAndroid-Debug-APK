@@ -46,6 +46,7 @@ android {
     }
 
     buildFeatures {
+        aidl = true
         compose = true
         buildConfig = true
     }
@@ -61,6 +62,10 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)
+
+    // Shizuku UserService diagnostic backend
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 
     // Core Android & Lifecycle
     implementation("androidx.core:core-ktx:1.15.0")

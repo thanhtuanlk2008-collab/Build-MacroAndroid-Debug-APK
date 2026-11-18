@@ -1,6 +1,7 @@
 package com.macro.app.service
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -18,6 +19,8 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.EditText
+import android.text.InputType
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -32,10 +35,14 @@ import com.macro.app.engine.MacroEngine
 import com.macro.app.engine.SpeedEngine
 import com.macro.app.model.MacroState
 import com.macro.app.utils.CoordinateConverter
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.coroutines.resume
 
 class FloatingControlService : LifecycleService() {
 
@@ -92,6 +99,10 @@ class FloatingControlService : LifecycleService() {
     private var btnPlayPause: TextView? = null
     private var btnRec: TextView? = null
     private var recControlsRow: LinearLayout? = null
+    private var tapBubble: TextView? = null
+    private var tapRunJob: Job? = null
+    private var tapRunActive = false
+    private var configuredTapCount = 10
 
     override fun onCreate() {
         super.onCreate()
@@ -111,6 +122,7 @@ class FloatingControlService : LifecycleService() {
 
         lifecycleScope.launch {
             val settings = settingsDataStore.settingsFlow.first()
+            configuredTapCount = getSharedPreferences("floating_tap", MODE_PRIVATE).getInt("repeat_count", 10).coerceAtLeast(1)
             panelAlpha = settings.floatingAlpha
             panelScale = settings.floatingScale
             showFloatingPanel(settings.floatingPosX, settings.floatingPosY)
@@ -206,220 +218,200 @@ class FloatingControlService : LifecycleService() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun showFloatingPanel(startX: Int, startY: Int) {
+        // A single small, draggable window replaces the former full control panel.
+        // Only this circle receives touch input; the rest of the screen has no overlay.
+        val size = dp(54)
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            size,
+            size,
             overlayLayoutType(),
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = startX
-            y = startY
+            x = startX.coerceAtLeast(0)
+            y = startY.coerceAtLeast(0)
         }
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val bubble = TextView(this).apply {
+            text = configuredTapCount.toString()
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 25f)
             alpha = panelAlpha
             scaleX = panelScale
             scaleY = panelScale
-        }
-
-        // Collapsed Pill
-        val pill = TextView(this).apply {
-            text = "⚡ MACRO"
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            background = makeCardBg(Color.parseColor("#E614161D"), Color.parseColor("#FF2E4C"), 20f)
-            visibility = View.GONE
-            setOnClickListener { toggleCollapse(false) }
-        }
-        collapsedPill = pill
-
-        // Expanded REDMAGIC-inspired Gaming Panel
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-            background = makeCardBg(Color.parseColor("#EC101218"), Color.parseColor("#FF2E4C"), 14f)
-        }
-        expandedContainer = panel
-
-        // Header (Drag Handle + Status + Hide + Settings)
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val statusBadge = TextView(this).apply {
-            text = "● IDLE"
-            setTextColor(Color.parseColor("#9AA3B2"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-            setPadding(0, 0, dp(8), 0)
-        }
-        tvStatusBadge = statusBadge
-
-        val btnHide = makeMiniBtn("—", "#252936") { toggleCollapse(true) }
-        val btnSettings = makeMiniBtn("⚙", "#252936") {
-            val intent = Intent(this, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#E62E6BFF"))
+                setStroke(dp(2), Color.parseColor("#FFBBD5FF"))
             }
-            startActivity(intent)
-        }
-        val btnClose = makeMiniBtn("✕", "#3A1C24") {
-            MacroEngine.emergencyStop()
-            stopSelf()
+            contentDescription = "Floating Tap Button. Kéo đến vị trí cần chạm."
+            setOnClickListener { /* handled by the touch listener after release */ }
         }
 
-        header.addView(statusBadge)
-        header.addView(btnHide)
-        header.addView(space(4))
-        header.addView(btnSettings)
-        header.addView(space(4))
-        header.addView(btnClose)
-        panel.addView(header)
+        var initialX = params.x
+        var initialY = params.y
+        var downRawX = 0f
+        var downRawY = 0f
+        var moved = false
+        var multiTouch = false
+        var downAt = 0L
+        val touchSlop = dp(7)
 
-        // Speed Row: MACRO SPEED: 1.0x  [-] [+]
-        val speedRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(6), 0, dp(6))
-        }
-        val speedText = TextView(this).apply {
-            text = "MACRO SPEED: 1.0x"
-            setTextColor(Color.parseColor("#FF4D67"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-            setPadding(0, 0, dp(8), 0)
-        }
-        tvSpeedBadge = speedText
-        val btnSpeedDown = makeMiniBtn("-", "#202430") { SpeedEngine.stepSpeedDown() }
-        val btnSpeedUp = makeMiniBtn("+", "#202430") { SpeedEngine.stepSpeedUp() }
-
-        speedRow.addView(speedText)
-        speedRow.addView(btnSpeedDown)
-        speedRow.addView(space(4))
-        speedRow.addView(btnSpeedUp)
-        panel.addView(speedRow)
-
-        // Main Action Row: REC | PLAY/PAUSE | STOP
-        val actionRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val recBtn = makeActionBtn("REC", "#B71C1C") { handleRecClick() }
-        btnRec = recBtn
-        val playPauseBtn = makeActionBtn("PLAY", "#1B5E20") { handlePlayPauseClick() }
-        btnPlayPause = playPauseBtn
-        val stopBtn = makeActionBtn("STOP", "#37474F") {
-            MacroEngine.emergencyStop()
-            if (MacroEngine.recorder.recorderState.value != MacroState.IDLE) {
-                MacroEngine.recorder.cancelRecording()
-                hideTargetPin()
-                MacroAccessibilityService.instance?.stopTouchRecordingOverlay()
-            }
-        }
-
-        actionRow.addView(recBtn)
-        actionRow.addView(space(5))
-        actionRow.addView(playPauseBtn)
-        actionRow.addView(space(5))
-        actionRow.addView(stopBtn)
-        panel.addView(actionRow)
-
-        // Recording Capture Row (Visible only when Target Pin Recorder is active)
-        val recRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(6), 0, 0)
-            visibility = View.GONE
-        }
-        recRow.addView(makeActionBtn("LƯU", "#2E7D32") {
-            MacroAccessibilityService.instance?.finishTouchRecordingAndSave()
-                ?: Toast.makeText(this, "Accessibility Service chưa sẵn sàng.", Toast.LENGTH_SHORT).show()
-        })
-        recControlsRow = recRow
-        panel.addView(recRow)
-
-        root.addView(pill)
-        root.addView(panel)
-
-        // Dragging support on root
-        var initialX = 0
-        var initialY = 0
-        var initialTouchX = 0f
-        var initialTouchY = 0f
-        var isDragging = false
-
-        header.setOnTouchListener { _, event ->
-            when (event.action) {
+        bubble.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
                     initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    isDragging = false
-                    false
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    downAt = event.eventTime
+                    moved = false
+                    multiTouch = false
+                    true
                 }
-                MotionEvent.ACTION_MOVE -> {
-                    val dx = (event.rawX - initialTouchX).toInt()
-                    val dy = (event.rawY - initialTouchY).toInt()
-                    if (abs(dx) > 6 || abs(dy) > 6) {
-                        isDragging = true
-                        params.x = initialX + dx
-                        params.y = initialY + dy
-                        windowManager.updateViewLayout(root, params)
-                    }
-                    isDragging
-                }
-                MotionEvent.ACTION_UP -> {
-                    if (isDragging) {
-                        lifecycleScope.launch {
-                            settingsDataStore.updateFloatingPosition(params.x, params.y)
-                        }
-                    }
-                    isDragging
-                }
-                else -> false
-            }
-        }
-
-        pill.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    isDragging = false
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    // Never synthesize a tap from a multi-finger interaction.
+                    multiTouch = true
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = (event.rawX - initialTouchX).toInt()
-                    val dy = (event.rawY - initialTouchY).toInt()
-                    if (abs(dx) > 8 || abs(dy) > 8) {
-                        isDragging = true
-                        params.x = initialX + dx
-                        params.y = initialY + dy
-                        windowManager.updateViewLayout(root, params)
+                    if (event.pointerCount > 1) multiTouch = true
+                    val dx = (event.rawX - downRawX).toInt()
+                    val dy = (event.rawY - downRawY).toInt()
+                    if (kotlin.math.abs(dx) > touchSlop || kotlin.math.abs(dy) > touchSlop) {
+                        moved = true
+                        val screenW = resources.displayMetrics.widthPixels
+                        val screenH = resources.displayMetrics.heightPixels
+                        params.x = (initialX + dx).coerceIn(0, (screenW - size).coerceAtLeast(0))
+                        params.y = (initialY + dy).coerceIn(0, (screenH - size).coerceAtLeast(0))
+                        runCatching { windowManager.updateViewLayout(view, params) }
                     }
+                    true
+                }
+                MotionEvent.ACTION_POINTER_UP -> {
+                    if (event.pointerCount > 1) multiTouch = true
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (isDragging) {
-                        lifecycleScope.launch {
-                            settingsDataStore.updateFloatingPosition(params.x, params.y)
+                    if (!multiTouch && !moved) {
+                        if (event.eventTime - downAt >= 600L) {
+                            showRepeatCountDialog()
+                        } else {
+                            toggleFloatingTapRun()
                         }
-                    } else {
-                        v.performClick()
                     }
+                    lifecycleScope.launch {
+                        settingsDataStore.updateFloatingPosition(params.x, params.y)
+                    }
+                    view.performClick()
                     true
                 }
-                else -> false
+                MotionEvent.ACTION_CANCEL -> {
+                    multiTouch = true
+                    true
+                }
+                else -> true
             }
         }
 
-        controlView = root
+        tapBubble = bubble
+        controlView = bubble
         controlParams = params
-        windowManager.addView(root, params)
+        windowManager.addView(bubble, params)
+    }
+
+    private fun showRepeatCountDialog() {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(configuredTapCount.toString())
+            setSelection(text.length)
+            hint = "Số lần nhấn"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Số lần nhấn")
+            .setMessage("Nhập số lần macro sẽ chạm tại vị trí nút tròn.")
+            .setView(input)
+            .setNegativeButton("Hủy", null)
+            .setPositiveButton("Lưu") { _, _ ->
+                val value = input.text.toString().toLongOrNull()
+                if (value == null || value < 1L || value > 1_000_000L) {
+                    Toast.makeText(this, "Nhập số từ 1 đến 1.000.000.", Toast.LENGTH_SHORT).show()
+                } else {
+                    configuredTapCount = value.toInt()
+                    getSharedPreferences("floating_tap", MODE_PRIVATE).edit()
+                        .putInt("repeat_count", configuredTapCount).apply()
+                    if (!tapRunActive) tapBubble?.text = configuredTapCount.toString()
+                    Toast.makeText(this, "Đã đặt $configuredTapCount lần nhấn.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .show()
+    }
+
+    private fun toggleFloatingTapRun() {
+        if (tapRunActive) {
+            tapRunJob?.cancel()
+            tapRunJob = null
+            tapRunActive = false
+            tapBubble?.text = configuredTapCount.toString()
+            Toast.makeText(this, "Đã dừng macro chạm.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val accessibility = MacroAccessibilityService.instance
+        if (accessibility == null) {
+            Toast.makeText(this, "Hãy bật MacroAndroid trong Cài đặt Trợ năng trước.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val targetX = (controlParams?.x ?: 0) + dp(27)
+        val targetY = (controlParams?.y ?: 0) + dp(27)
+        val count = configuredTapCount
+        tapRunActive = true
+        tapBubble?.text = "■"
+        tapRunJob = lifecycleScope.launch {
+            var completed = 0
+            try {
+                while (completed < count && tapRunActive) {
+                    val params = controlParams
+                    if (params != null) {
+                        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        controlView?.let { runCatching { windowManager.updateViewLayout(it, params) } }
+                    }
+                    val finished = suspendCancellableCoroutine<Boolean> { continuation ->
+                        val accepted = accessibility.dispatchTapAt(targetX.toFloat(), targetY.toFloat()) {
+                            if (continuation.isActive) continuation.resume(true)
+                        }
+                        if (!accepted && continuation.isActive) continuation.resume(false)
+                    }
+                    val restore = controlParams
+                    if (restore != null) {
+                        restore.flags = restore.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                        controlView?.let { runCatching { windowManager.updateViewLayout(it, restore) } }
+                    }
+                    if (!finished) {
+                        Toast.makeText(this@FloatingControlService, "Android từ chối thao tác chạm; macro đã dừng.", Toast.LENGTH_SHORT).show()
+                        break
+                    }
+                    completed++
+                    tapBubble?.text = "$completed"
+                    if (completed < count && tapRunActive) delay(120L)
+                }
+            } finally {
+                val restore = controlParams
+                if (restore != null) {
+                    restore.flags = restore.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                    controlView?.let { runCatching { windowManager.updateViewLayout(it, restore) } }
+                }
+                tapRunActive = false
+                tapRunJob = null
+                tapBubble?.text = configuredTapCount.toString()
+                if (completed == count) {
+                    Toast.makeText(this@FloatingControlService, "Hoàn thành $completed lần nhấn.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -676,6 +668,9 @@ class FloatingControlService : LifecycleService() {
 
     override fun onDestroy() {
         isRunning = false
+        tapRunJob?.cancel()
+        tapRunJob = null
+        tapRunActive = false
         hideTargetPin()
         controlView?.let { runCatching { windowManager.removeView(it) } }
         controlView = null

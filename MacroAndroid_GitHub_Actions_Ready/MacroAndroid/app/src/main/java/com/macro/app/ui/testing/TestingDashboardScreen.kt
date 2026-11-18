@@ -47,6 +47,8 @@ import com.macro.app.ui.theme.GamingColors
 @Composable
 fun TestingDashboardScreen(
     isAccessibilityConnected: Boolean,
+    shizukuProbeStatus: String,
+    onProbeShizuku: () -> Unit,
     floatingActive: Boolean,
     telemetry: PlaybackTelemetry,
     currentSpeed: Float,
@@ -72,7 +74,7 @@ fun TestingDashboardScreen(
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = "Giám sát dịch vụ, tốc độ thực tế và kiểm thử Human Touch Independence trên vivo Y31d",
+                text = "Giám sát dịch vụ, tốc độ macro và kiểm tra xung đột cảm ứng trên Android.",
                 style = MaterialTheme.typography.bodySmall,
                 color = GamingColors.TextSecondary
             )
@@ -106,6 +108,39 @@ fun TestingDashboardScreen(
             }
         }
 
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = GamingColors.CarbonSurface),
+                border = BorderStroke(1.dp, GamingColors.CyberBlue.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "SHIZUKU USER SERVICE — KIỂM TRA QUYỀN",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = GamingColors.CyberBlue
+                    )
+                    Text(
+                        text = "Kiểm tra UID và quyền INJECT_EVENTS ngay trong tiến trình UserService. Bước này chỉ chẩn đoán, không gửi thao tác chạm.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GamingColors.TextSecondary
+                    )
+                    OutlinedButton(onClick = onProbeShizuku) {
+                        Text("Kiểm tra Shizuku")
+                    }
+                    Text(
+                        text = shizukuProbeStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GamingColors.TextPrimary
+                    )
+                }
+            }
+        }
+
         // Human Touch Independence Interactive Test Pad
         item {
             Card(
@@ -115,13 +150,13 @@ fun TestingDashboardScreen(
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "KIỂM THỬ THAO TÁC THỦ CÔNG SONG SONG",
+                        text = "KIỂM TRA SỰ KIỆN CẢM ỨNG THỦ CÔNG",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = GamingColors.CyberBlue
                     )
                     Text(
-                        text = "Bấm 'Chạy Macro Test' (sẽ tự động chạm ở góc dưới), đồng thời bạn hãy vuốt hoặc chạm liên tục trong khung bên dưới để đo xung đột trên Android 16.",
+                        text = "Chạy macro thử nghiệm rồi chạm hoặc vuốt trong khung bên dưới. Bảng này chỉ ghi nhận sự kiện cảm ứng mà ứng dụng nhận được; kết quả không chứng minh hai luồng cảm ứng độc lập.",
                         style = MaterialTheme.typography.bodySmall,
                         color = GamingColors.TextSecondary
                     )
@@ -175,9 +210,20 @@ fun TestingDashboardScreen(
                                         activePointers = event.pointerCount
                                         totalHumanEvents++
                                     }
-                                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                                    MotionEvent.ACTION_POINTER_UP -> {
                                         activePointers = (event.pointerCount - 1).coerceAtLeast(0)
-                                        lastTouchLog = "RELEASE: còn $activePointers ngón"
+                                        totalHumanEvents++
+                                        lastTouchLog = "POINTER UP: còn $activePointers ngón"
+                                    }
+                                    MotionEvent.ACTION_UP -> {
+                                        activePointers = 0
+                                        totalHumanEvents++
+                                        lastTouchLog = "UP: đã nhấc ngón"
+                                    }
+                                    MotionEvent.ACTION_CANCEL -> {
+                                        activePointers = 0
+                                        totalHumanEvents++
+                                        lastTouchLog = "CANCEL: hệ thống đã hủy chuỗi chạm"
                                     }
                                 }
                                 true

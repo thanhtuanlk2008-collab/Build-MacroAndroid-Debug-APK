@@ -84,6 +84,7 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
     val floatingActive by viewModel.floatingActive.collectAsState()
     val editingMacro by viewModel.editingMacro.collectAsState()
     val isAccessibilityConnected by viewModel.isAccessibilityConnected.collectAsState()
+    val shizukuProbeStatus by viewModel.shizukuProbeStatus.collectAsState()
 
     var currentTab by remember { mutableStateOf(NavTab.HOME) }
 
@@ -188,6 +189,8 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
 
                     NavTab.TESTING -> TestingDashboardScreen(
                         isAccessibilityConnected = isAccessibilityConnected,
+                        shizukuProbeStatus = shizukuProbeStatus,
+                        onProbeShizuku = { viewModel.probeShizuku() },
                         floatingActive = floatingActive,
                         telemetry = telemetry,
                         currentSpeed = speed,

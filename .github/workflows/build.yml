@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+      - feature/floating-tap-button
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read

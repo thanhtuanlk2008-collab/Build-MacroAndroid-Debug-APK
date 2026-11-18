@@ -60,3 +60,9 @@ A positive `INJECT_EVENTS` permission result is only a prerequisite for further 
 4. Share the diagnostic text showing UID and `INJECT_EVENTS` status.
 
 Do not test simultaneous touch injection yet; this version only performs a permission/identity probe.
+
+## Build verification
+
+- Source revision selected for the requested debug build: `089399e7a594a7abe5cc09587f98caa8c3ff3791`.
+- This documentation-only commit is used to trigger the repository's existing `push` workflow on `feature/floating-tap-button`.
+- The build result must be checked in GitHub Actions; a successful trigger is not a successful build.

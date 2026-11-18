@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MacroEngine Pro</string>
+    <string name="accessibility_service_label">MacroEngine Pro Touch Automation</string>
+    <string name="accessibility_service_description">Cho phép MacroEngine Pro thực hiện thao tác chạm, nhấn giữ và vuốt tự động theo chuỗi Macro bạn đã thiết lập. Ứng dụng không đọc nội dung màn hình hay mật khẩu của bạn.</string>
+</resources>

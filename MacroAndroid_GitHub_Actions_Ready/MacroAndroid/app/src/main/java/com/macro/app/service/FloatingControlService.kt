@@ -506,7 +506,7 @@ class FloatingControlService : LifecycleService() {
         lifecycleScope.launch {
             repository.saveMacro(macro)
             MacroEngine.selectMacro(macro)
-            Toast.makeText(this, "Đã lưu ${macro.name} (${macro.actions.size} bước)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@FloatingControlService, "Đã lưu ${macro.name} (${macro.actions.size} bước)", Toast.LENGTH_SHORT).show()
         }
     }
 

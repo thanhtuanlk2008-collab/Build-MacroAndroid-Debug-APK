@@ -1,6 +1,7 @@
 package com.macro.app.service
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -18,6 +19,8 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.EditText
+import android.text.InputType
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -32,10 +35,14 @@ import com.macro.app.engine.MacroEngine
 import com.macro.app.engine.SpeedEngine
 import com.macro.app.model.MacroState
 import com.macro.app.utils.CoordinateConverter
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.coroutines.resume
 
 class FloatingControlService : LifecycleService() {
 
@@ -92,6 +99,10 @@ class FloatingControlService : LifecycleService() {
     private var btnPlayPause: TextView? = null
     private var btnRec: TextView? = null
     private var recControlsRow: LinearLayout? = null
+    private var tapBubble: TextView? = null
+    private var tapRunJob: Job? = null
+    private var tapRunActive = false
+    private var configuredTapCount = 10
 
     override fun onCreate() {
         super.onCreate()
@@ -111,6 +122,7 @@ class FloatingControlService : LifecycleService() {
 
         lifecycleScope.launch {
             val settings = settingsDataStore.settingsFlow.first()
+            configuredTapCount = getSharedPreferences("floating_tap", MODE_PRIVATE).getInt("repeat_count", 10).coerceAtLeast(1)
             panelAlpha = settings.floatingAlpha
             panelScale = settings.floatingScale
             showFloatingPanel(settings.floatingPosX, settings.floatingPosY)
@@ -222,7 +234,7 @@ class FloatingControlService : LifecycleService() {
         }
 
         val bubble = TextView(this).apply {
-            text = "●"
+            text = configuredTapCount.toString()
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 25f)
@@ -235,10 +247,7 @@ class FloatingControlService : LifecycleService() {
                 setStroke(dp(2), Color.parseColor("#FFBBD5FF"))
             }
             contentDescription = "Floating Tap Button. Kéo đến vị trí cần chạm."
-            setOnClickListener {
-                // The tap is dispatched from ACTION_UP so it happens after the
-                // user's finger has released the floating control.
-            }
+            setOnClickListener { /* handled by the touch listener after release */ }
         }
 
         var initialX = params.x
@@ -247,6 +256,7 @@ class FloatingControlService : LifecycleService() {
         var downRawY = 0f
         var moved = false
         var multiTouch = false
+        var downAt = 0L
         val touchSlop = dp(7)
 
         bubble.setOnTouchListener { view, event ->
@@ -256,6 +266,7 @@ class FloatingControlService : LifecycleService() {
                     initialY = params.y
                     downRawX = event.rawX
                     downRawY = event.rawY
+                    downAt = event.eventTime
                     moved = false
                     multiTouch = false
                     true
@@ -284,41 +295,11 @@ class FloatingControlService : LifecycleService() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!multiTouch) {
-                        val tapX = params.x + size / 2f
-                        val tapY = params.y + size / 2f
-                        val accessibility = MacroAccessibilityService.instance
-                        if (accessibility == null) {
-                            Toast.makeText(
-                                this,
-                                "Hãy bật MacroAndroid trong Cài đặt Trợ năng để sử dụng Tap.",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                    if (!multiTouch && !moved) {
+                        if (event.eventTime - downAt >= 600L) {
+                            showRepeatCountDialog()
                         } else {
-                            // Make only the small bubble window pass-through while the
-                            // synthetic tap is delivered to the app beneath it.
-                            val currentParams = controlParams
-                            if (currentParams != null) {
-                                currentParams.flags = currentParams.flags or
-                                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                                controlView?.let { view ->
-                                    runCatching { windowManager.updateViewLayout(view, currentParams) }
-                                }
-                            }
-                            val restoreBubble = {
-                                if (currentParams != null) {
-                                    currentParams.flags = currentParams.flags and
-                                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-                                    controlView?.let { view ->
-                                        runCatching { windowManager.updateViewLayout(view, currentParams) }
-                                    }
-                                }
-                            }
-                            val accepted = accessibility.dispatchTapAt(tapX, tapY, restoreBubble)
-                            if (!accepted) {
-                                restoreBubble()
-                                Toast.makeText(this, "Android không chấp nhận thao tác chạm.", Toast.LENGTH_SHORT).show()
-                            }
+                            toggleFloatingTapRun()
                         }
                     }
                     lifecycleScope.launch {
@@ -335,9 +316,102 @@ class FloatingControlService : LifecycleService() {
             }
         }
 
+        tapBubble = bubble
         controlView = bubble
         controlParams = params
         windowManager.addView(bubble, params)
+    }
+
+    private fun showRepeatCountDialog() {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(configuredTapCount.toString())
+            setSelection(text.length)
+            hint = "Số lần nhấn"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Số lần nhấn")
+            .setMessage("Nhập số lần macro sẽ chạm tại vị trí nút tròn.")
+            .setView(input)
+            .setNegativeButton("Hủy", null)
+            .setPositiveButton("Lưu") { _, _ ->
+                val value = input.text.toString().toLongOrNull()
+                if (value == null || value < 1L || value > 1_000_000L) {
+                    Toast.makeText(this, "Nhập số từ 1 đến 1.000.000.", Toast.LENGTH_SHORT).show()
+                } else {
+                    configuredTapCount = value.toInt()
+                    getSharedPreferences("floating_tap", MODE_PRIVATE).edit()
+                        .putInt("repeat_count", configuredTapCount).apply()
+                    if (!tapRunActive) tapBubble?.text = configuredTapCount.toString()
+                    Toast.makeText(this, "Đã đặt $configuredTapCount lần nhấn.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .show()
+    }
+
+    private fun toggleFloatingTapRun() {
+        if (tapRunActive) {
+            tapRunJob?.cancel()
+            tapRunJob = null
+            tapRunActive = false
+            tapBubble?.text = configuredTapCount.toString()
+            Toast.makeText(this, "Đã dừng macro chạm.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val accessibility = MacroAccessibilityService.instance
+        if (accessibility == null) {
+            Toast.makeText(this, "Hãy bật MacroAndroid trong Cài đặt Trợ năng trước.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val targetX = (controlParams?.x ?: 0) + dp(27)
+        val targetY = (controlParams?.y ?: 0) + dp(27)
+        val count = configuredTapCount
+        tapRunActive = true
+        tapBubble?.text = "■"
+        tapRunJob = lifecycleScope.launch {
+            var completed = 0
+            try {
+                while (completed < count && tapRunActive) {
+                    val params = controlParams
+                    if (params != null) {
+                        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        controlView?.let { runCatching { windowManager.updateViewLayout(it, params) } }
+                    }
+                    val finished = suspendCancellableCoroutine<Boolean> { continuation ->
+                        val accepted = accessibility.dispatchTapAt(targetX.toFloat(), targetY.toFloat()) {
+                            if (continuation.isActive) continuation.resume(true)
+                        }
+                        if (!accepted && continuation.isActive) continuation.resume(false)
+                    }
+                    val restore = controlParams
+                    if (restore != null) {
+                        restore.flags = restore.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                        controlView?.let { runCatching { windowManager.updateViewLayout(it, restore) } }
+                    }
+                    if (!finished) {
+                        Toast.makeText(this@FloatingControlService, "Android từ chối thao tác chạm; macro đã dừng.", Toast.LENGTH_SHORT).show()
+                        break
+                    }
+                    completed++
+                    tapBubble?.text = "$completed"
+                    if (completed < count && tapRunActive) delay(120L)
+                }
+            } finally {
+                val restore = controlParams
+                if (restore != null) {
+                    restore.flags = restore.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                    controlView?.let { runCatching { windowManager.updateViewLayout(it, restore) } }
+                }
+                tapRunActive = false
+                tapRunJob = null
+                tapBubble?.text = configuredTapCount.toString()
+                if (completed == count) {
+                    Toast.makeText(this@FloatingControlService, "Hoàn thành $completed lần nhấn.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -594,6 +668,9 @@ class FloatingControlService : LifecycleService() {
 
     override fun onDestroy() {
         isRunning = false
+        tapRunJob?.cancel()
+        tapRunJob = null
+        tapRunActive = false
         hideTargetPin()
         controlView?.let { runCatching { windowManager.removeView(it) } }
         controlView = null

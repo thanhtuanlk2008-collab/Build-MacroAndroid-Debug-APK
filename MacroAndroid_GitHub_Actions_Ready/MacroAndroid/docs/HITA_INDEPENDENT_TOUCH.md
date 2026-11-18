@@ -19,7 +19,7 @@ The session manager does not create MotionEvent streams or bypass Android's inpu
 | Backend | Status | Reason |
 |---|---|---|
 | Accessibility `dispatchGesture()` | Existing fallback | Synthetic gestures can conflict with/cancel ongoing gestures |
-| Shizuku UserService | Not implemented | Must probe permissions from the shell-side process; checking the app UID says nothing about UID 2000 |
+| Shizuku UserService | Diagnostic only; no input injector | The probe reports the UserService UID and permission state; it does not send touch events or establish independent streams |
 | ADB shell | Not implemented | `input tap/swipe` is not proof of concurrent independent touchscreen streams |
 | Virtual input device/uinput | Research only | Usually requires device-node, SELinux and/or privileged access not available to an ordinary app |
 

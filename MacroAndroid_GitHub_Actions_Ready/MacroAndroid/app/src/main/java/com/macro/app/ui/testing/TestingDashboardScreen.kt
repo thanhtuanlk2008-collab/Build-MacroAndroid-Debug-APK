@@ -119,7 +119,7 @@ fun TestingDashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "SHIZUKU INPUT BACKEND — KIỂM TRA QUYỀN",
+                        text = "SHIZUKU USER SERVICE — KIỂM TRA QUYỀN",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = GamingColors.CyberBlue

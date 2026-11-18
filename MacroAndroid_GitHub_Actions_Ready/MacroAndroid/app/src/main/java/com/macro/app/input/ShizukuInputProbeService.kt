@@ -1,6 +1,5 @@
 package com.macro.app.input
 
-import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Process
@@ -23,7 +22,7 @@ class ShizukuInputProbeService(
 
     override fun hasInjectEventsPermission(): Boolean =
         serviceContext.checkPermission(
-            Manifest.permission.INJECT_EVENTS,
+            "android.permission.INJECT_EVENTS",
             Process.myPid(),
             Process.myUid()
         ) == PackageManager.PERMISSION_GRANTED

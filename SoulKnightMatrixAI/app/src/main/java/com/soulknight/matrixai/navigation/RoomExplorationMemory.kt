@@ -38,6 +38,15 @@ class RoomExplorationMemory {
         previousFingerprint = room.fingerprint
     }
 
+    /** Adds a door/exit edge discovered by the current room scan. */
+    @Synchronized
+    fun connectRooms(fromFingerprint: Long, toFingerprint: Long) {
+        require(fromFingerprint != toFingerprint)
+        if (fromFingerprint !in rooms || toFingerprint !in rooms) return
+        edges.getOrPut(fromFingerprint) { linkedSetOf() }.add(toFingerprint)
+        edges.getOrPut(toFingerprint) { linkedSetOf() }.add(fromFingerprint)
+    }
+
     @Synchronized
     fun markCleared(fingerprint: Long) {
         rooms[fingerprint]?.let { rooms[fingerprint] = it.copy(cleared = true) }

@@ -118,3 +118,13 @@ The tracker and joystick gesture APIs are committed as reusable components, but 
 - The stored values are in downscaled preview pixels per second. They must be validated on-device before being used for navigation. Buff-change monitoring exists as a calculation module but is not yet connected to continuous in-game movement control.
 - No static Wiki screenshots are bundled for player tracking: a live capture from the user's actual game session is more appropriate because character appearance, room layout, UI scale and screen coordinates vary.
 
+
+
+## Adaptive player tracking and speed-buff observation
+
+- The player patch tracker now slowly adapts its visual template after high-confidence matches to tolerate small animation and lighting changes. It still requires the user to seed the player centre; it is not a from-scratch character detector.
+- `MovementAdaptiveSession` is a passive, user-started observer. It tracks naturally occurring player movement, infers horizontal/vertical/diagonal direction from displacement, and compares measured speed with the calibrated profile.
+- When a measured speed differs by at least the configured 12% threshold, the monitor updates the corresponding profile value and the app persists it locally.
+- The observer sends no joystick gestures. It does not prove that a speed change came from a buff: terrain, collision, status effects, camera movement, animation, or tracking errors can affect measurements. Validate the result in a clear area and stop observation when tracking is unreliable.
+- The UI provides explicit start/stop controls. A calibrated profile and a selected player centre are required before monitoring can start.
+

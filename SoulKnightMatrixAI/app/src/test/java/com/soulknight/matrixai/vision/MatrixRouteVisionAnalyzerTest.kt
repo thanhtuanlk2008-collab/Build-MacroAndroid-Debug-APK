@@ -65,7 +65,8 @@ class MatrixRouteVisionAnalyzerTest {
             biomeTemplates = mapOf(MatrixBiome.OTHER to ImageTemplate("other-biome", 2, 2, biomePatch)),
             sirVerdantEntranceTemplate = ImageTemplate("sir-verdant-entrance", 2, 2, portalPatch),
             biomeRegion = ScreenRegion(0, 0, 4, 4),
-            routeRegion = ScreenRegion(6, 2, 12, 8)
+            routeRegion = ScreenRegion(6, 2, 12, 8),
+            searchStep = 1
         )
 
         assertEquals(MatrixBiome.OTHER, result.vision.biome)
@@ -98,7 +99,8 @@ class MatrixRouteVisionAnalyzerTest {
             biomeTemplates = mapOf(MatrixBiome.GLACIER to ImageTemplate("glacier", 2, 2, biomePatch)),
             sirVerdantEntranceTemplate = ImageTemplate("sir-verdant-entrance", 2, 2, portalPatch),
             biomeRegion = ScreenRegion(0, 0, 4, 4),
-            routeRegion = ScreenRegion(6, 2, 12, 8)
+            routeRegion = ScreenRegion(6, 2, 12, 8),
+            searchStep = 1
         )
         assertEquals(RouteAction.SKIP_SPECIAL_ROOM, result.decision.action)
     }

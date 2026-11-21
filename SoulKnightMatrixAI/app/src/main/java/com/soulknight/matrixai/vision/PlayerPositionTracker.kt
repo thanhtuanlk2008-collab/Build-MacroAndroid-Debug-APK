@@ -17,7 +17,8 @@ data class TrackedPlayerPosition(
 class PlayerPositionTracker(
     private val patchRadius: Int = 6,
     private val searchRadius: Int = 42,
-    private val minimumConfidence: Float = 0.78f
+    private val minimumConfidence: Float = 0.78f,
+    private val templateAdaptation: Float = 0.06f
 ) {
     private var template: IntArray? = null
     private var lastX = -1
@@ -27,6 +28,7 @@ class PlayerPositionTracker(
         require(patchRadius >= 2)
         require(searchRadius >= 1)
         require(minimumConfidence in 0f..1f)
+        require(templateAdaptation in 0f..0.25f)
     }
 
     fun initialize(frame: FrameSnapshot, playerCenterX: Int, playerCenterY: Int): Boolean {
@@ -63,6 +65,7 @@ class PlayerPositionTracker(
         if (confidence < minimumConfidence) return null
         lastX = bestX
         lastY = bestY
+        if (templateAdaptation > 0f) adaptTemplate(frame, bestX, bestY, reference)
         return TrackedPlayerPosition(bestX, bestY, confidence, frame.timestampMillis)
     }
 
@@ -82,6 +85,23 @@ class PlayerPositionTracker(
             val x = cx + index % size - patchRadius
             val y = cy + index / size - patchRadius
             frame.pixel(x, y) ?: 0
+        }
+    }
+
+    /** Slowly follows animation/lighting changes without accepting low-confidence matches. */
+    private fun adaptTemplate(frame: FrameSnapshot, cx: Int, cy: Int, reference: IntArray) {
+        val size = patchRadius * 2 + 1
+        val alpha = templateAdaptation
+        for (dy in -patchRadius..patchRadius) for (dx in -patchRadius..patchRadius) {
+            val index = (dy + patchRadius) * size + dx + patchRadius
+            val current = frame.pixel(cx + dx, cy + dy) ?: continue
+            val old = reference[index]
+            fun blend(shift: Int): Int {
+                val a = (old shr shift) and 255
+                val b = (current shr shift) and 255
+                return (a + ((b - a) * alpha).toInt()).coerceIn(0, 255)
+            }
+            reference[index] = (0xff shl 24) or (blend(16) shl 16) or (blend(8) shl 8) or blend(0)
         }
     }
 

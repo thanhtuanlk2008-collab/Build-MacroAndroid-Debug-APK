@@ -178,6 +178,6 @@ class ScreenCaptureService : Service() {
         const val EXTRA_RESULT_DATA = "capture_result_data"
         private const val NOTIFICATION_ID = 4101
         private const val MAX_FRAME_WIDTH = 480
-        private const val FRAME_INTERVAL_MS = 200L
+        private const val FRAME_INTERVAL_MS = 100L
     }
 }

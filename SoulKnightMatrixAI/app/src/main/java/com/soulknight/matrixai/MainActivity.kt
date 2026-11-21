@@ -1,6 +1,7 @@
 package com.soulknight.matrixai
 
 import android.app.Activity
+import android.graphics.Bitmap
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.provider.Settings
@@ -10,12 +11,17 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -30,6 +36,11 @@ import com.soulknight.matrixai.input.InputTarget
 import com.soulknight.matrixai.input.InputTargetConfig
 import com.soulknight.matrixai.input.InputTargetStore
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.min
+import com.soulknight.matrixai.vision.FrameSnapshot
+import com.soulknight.matrixai.movement.MovementCalibrationRunner
+import com.soulknight.matrixai.movement.MovementProfile
+import com.soulknight.matrixai.movement.MovementProfileStore
 
 class MainActivity : ComponentActivity() {
     private var accessibilityConnected by mutableStateOf(false)
@@ -55,6 +66,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val store = MacroProfileStore(this)
         val targetStore = InputTargetStore(this)
+        val movementProfileStore = MovementProfileStore(this)
         setContent {
             var targets by remember { mutableStateOf(targetStore.load()) }
             val targetRef = remember { AtomicReference(targets) }
@@ -67,11 +79,35 @@ class MainActivity : ComponentActivity() {
             var config by remember { mutableStateOf(store.load()) }
             var captureStatus by remember { mutableStateOf("Chưa cấp quyền chụp màn hình") }
             var frameStatus by remember { mutableStateOf("Chưa nhận được khung hình") }
+            var previewFrame by remember { mutableStateOf<FrameSnapshot?>(null) }
+            var playerCenterX by remember { mutableStateOf("") }
+            var playerCenterY by remember { mutableStateOf("") }
+            var joystickCenterX by remember { mutableStateOf("") }
+            var joystickCenterY by remember { mutableStateOf("") }
+            var safeCalibrationArea by remember { mutableStateOf(false) }
+            var movementStatus by remember { mutableStateOf("Chưa hiệu chỉnh tốc độ") }
+            var movementProfile by remember { mutableStateOf(movementProfileStore.load()) }
             var macroStatus by remember { mutableStateOf("Macro đang dừng") }
             var lastEvent by remember { mutableStateOf("Chưa có sự kiện") }
             var profileName by remember { mutableStateOf("Cấu hình mới") }
             var profiles by remember { mutableStateOf(store.profileNames()) }
             val mainHandler = remember { Handler(Looper.getMainLooper()) }
+            val calibrationRunner = remember {
+                MovementCalibrationRunner(
+                    inputController = MatrixAccessibilityService.inputController(),
+                    handler = mainHandler,
+                    screenWidth = resources.displayMetrics.widthPixels,
+                    screenHeight = resources.displayMetrics.heightPixels
+                ) { status, profile ->
+                    mainHandler.post {
+                        movementStatus = status
+                        if (profile != null) {
+                            movementProfile = profile
+                            movementProfileStore.save(profile)
+                        }
+                    }
+                }
+            }
             val inputQueue = remember {
                 InputActionQueue(
                     controller = MatrixAccessibilityService.inputController(),
@@ -103,8 +139,12 @@ class MainActivity : ComponentActivity() {
                 onDispose { scheduler.stop(); inputQueue.stop() }
             }
             DisposableEffect(Unit) {
+                onDispose { calibrationRunner.stop() }
+            }
+            DisposableEffect(Unit) {
                 val frameListener: (com.soulknight.matrixai.vision.FrameSnapshot) -> Unit = { frame ->
                     mainHandler.post {
+                        previewFrame = frame
                         frameStatus = "Đang nhận khung hình: ${frame.width} × ${frame.height} (xấp xỉ 5 FPS)"
                     }
                 }
@@ -324,6 +364,73 @@ class MainActivity : ComponentActivity() {
                                 ) { Text("Dừng chụp màn hình") }
                             }
                         }
+
+                        Card {
+                            Column(
+                                Modifier.fillMaxWidth().padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("5. Hiệu chỉnh tốc độ di chuyển", style = MaterialTheme.typography.titleLarge)
+                                Text("Chạm vào tâm nhân vật trên ảnh xem trước. Tọa độ này thuộc ảnh đã thu nhỏ, không phải tọa độ màn hình.")
+                                val currentFrame = previewFrame
+                                if (currentFrame != null) {
+                                    PlayerSelectionPreview(currentFrame) { x, y ->
+                                        playerCenterX = x.toString()
+                                        playerCenterY = y.toString()
+                                    }
+                                } else {
+                                    Text("Chưa có ảnh xem trước. Hãy cấp quyền chụp màn hình trước.")
+                                }
+                                Text("Tâm nhân vật trong ảnh: X=$playerCenterX, Y=$playerCenterY")
+                                Text("Nhập tâm joystick theo pixel màn hình thật của điện thoại:")
+                                CoordinateFields("Tâm joystick", joystickCenterX, joystickCenterY,
+                                    { joystickCenterX = it }, { joystickCenterY = it })
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(checked = safeCalibrationArea, onCheckedChange = { safeCalibrationArea = it })
+                                    Text("Tôi đang ở khu vực trống, không sát tường hoặc cửa.")
+                                }
+                                Text(movementStatus, style = MaterialTheme.typography.bodySmall)
+                                if (movementProfile.confidence > 0f) {
+                                    Text(
+                                        "Tốc độ (pixel ảnh/giây): ngang %.1f · dọc %.1f · chéo %.1f · độ tin cậy %.0f%%".format(
+                                            movementProfile.horizontalPixelsPerSecond,
+                                            movementProfile.verticalPixelsPerSecond,
+                                            movementProfile.diagonalPixelsPerSecond,
+                                            movementProfile.confidence * 100f
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                Button(
+                                    enabled = previewFrame != null && accessibilityConnected && safeCalibrationArea,
+                                    onClick = {
+                                        val px = playerCenterX.toIntOrNull()
+                                        val py = playerCenterY.toIntOrNull()
+                                        val jx = joystickCenterX.toFloatOrNull()
+                                        val jy = joystickCenterY.toFloatOrNull()
+                                        if (px == null || py == null || jx == null || jy == null) {
+                                            movementStatus = "Hãy chọn tâm nhân vật và nhập tọa độ joystick hợp lệ."
+                                        } else {
+                                            val started = calibrationRunner.start(px, py, InputTarget(jx, jy))
+                                            if (!started && movementStatus == "Chưa hiệu chỉnh tốc độ") {
+                                                movementStatus = "Không thể bắt đầu hiệu chỉnh. Kiểm tra quyền và tọa độ."
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Quét tốc độ di chuyển") }
+                                OutlinedButton(
+                                    onClick = { calibrationRunner.stop() },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Dừng hiệu chỉnh") }
+                                Text(
+                                    "AI thực hiện 3 lượt joystick ngắn, lần lượt ngang, dọc và chéo. Tốc độ được đo trên ảnh chụp 5 FPS; nếu nhân vật không di chuyển rõ, phép đo sẽ bị từ chối.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+
                         Text(
                             "Macro Engine và AI Engine được tách riêng. Điều khiển cảm ứng thực tế " +
                                 "cần InputController có quyền phù hợp và kiểm thử trên thiết bị.",
@@ -334,6 +441,33 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+
+@Composable
+private fun PlayerSelectionPreview(frame: FrameSnapshot, onSelected: (Int, Int) -> Unit) {
+    val bitmap = remember(frame) {
+        Bitmap.createBitmap(frame.pixels, frame.width, frame.height, Bitmap.Config.ARGB_8888).asImageBitmap()
+    }
+    Image(
+        bitmap = bitmap,
+        contentDescription = "Ảnh chụp màn hình game; chạm vào tâm nhân vật để chọn vị trí theo dõi",
+        contentScale = ContentScale.Fit,
+        modifier = Modifier.fillMaxWidth().height(220.dp).pointerInput(frame) {
+            detectTapGestures { offset ->
+                val scale = min(size.width.toFloat() / frame.width, size.height.toFloat() / frame.height)
+                val renderedWidth = frame.width * scale
+                val renderedHeight = frame.height * scale
+                val left = (size.width - renderedWidth) / 2f
+                val top = (size.height - renderedHeight) / 2f
+                if (offset.x in left..(left + renderedWidth) && offset.y in top..(top + renderedHeight)) {
+                    val x = ((offset.x - left) / scale).toInt().coerceIn(0, frame.width - 1)
+                    val y = ((offset.y - top) / scale).toInt().coerceIn(0, frame.height - 1)
+                    onSelected(x, y)
+                }
+            }
+        }
+    )
 }
 
 @Composable

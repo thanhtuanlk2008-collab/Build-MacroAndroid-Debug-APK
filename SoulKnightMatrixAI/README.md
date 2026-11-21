@@ -21,3 +21,5 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`
 - [ ] Input adapter feasibility testing
 
 The current capture service acquires and immediately closes frames to validate the capture pipeline. It does not yet analyze the game or send touch input.
+
+Workflow Android SDK bootstrap has been updated to use the runner-provided command-line tools.

@@ -24,10 +24,11 @@ class MatrixStateMachine(initial: MatrixState = MatrixState.IDLE) {
             MatrixState.OBSERVING to setOf(MatrixState.EXPLORING, MatrixState.COMBAT, MatrixState.ROOM_CLEAR, MatrixState.TRANSITION, MatrixState.BOSS, MatrixState.UNKNOWN, MatrixState.STOPPED),
             MatrixState.EXPLORING to setOf(MatrixState.OBSERVING, MatrixState.COMBAT, MatrixState.ROOM_CLEAR, MatrixState.UNKNOWN, MatrixState.STOPPED),
             MatrixState.COMBAT to setOf(MatrixState.OBSERVING, MatrixState.ROOM_CLEAR, MatrixState.BOSS, MatrixState.UNKNOWN, MatrixState.STOPPED),
-            MatrixState.ROOM_CLEAR to setOf(MatrixState.REWARD, MatrixState.TRANSITION, MatrixState.OBSERVING, MatrixState.UNKNOWN, MatrixState.STOPPED),
+            MatrixState.ROOM_CLEAR to setOf(MatrixState.REWARD, MatrixState.SPECIAL_ROUTE_CHECK, MatrixState.TRANSITION, MatrixState.OBSERVING, MatrixState.UNKNOWN, MatrixState.STOPPED),
             MatrixState.REWARD to setOf(MatrixState.TRANSITION, MatrixState.OBSERVING, MatrixState.UNKNOWN, MatrixState.STOPPED),
             MatrixState.TRANSITION to setOf(MatrixState.OBSERVING, MatrixState.BOSS, MatrixState.UNKNOWN, MatrixState.STOPPED),
             MatrixState.BOSS to setOf(MatrixState.COMBAT, MatrixState.ROOM_CLEAR, MatrixState.UNKNOWN, MatrixState.STOPPED),
+            MatrixState.SPECIAL_ROUTE_CHECK to setOf(MatrixState.EXPLORING, MatrixState.TRANSITION, MatrixState.OBSERVING, MatrixState.UNKNOWN, MatrixState.STOPPED),
             MatrixState.UNKNOWN to setOf(MatrixState.OBSERVING, MatrixState.STOPPED),
             MatrixState.STOPPED to setOf(MatrixState.IDLE)
         )

@@ -10,6 +10,7 @@ enum class MatrixState {
     REWARD,
     TRANSITION,
     BOSS,
+    SPECIAL_ROUTE_CHECK,
     UNKNOWN,
     STOPPED
 }

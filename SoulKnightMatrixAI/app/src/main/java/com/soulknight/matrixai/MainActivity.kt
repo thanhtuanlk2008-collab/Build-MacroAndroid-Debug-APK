@@ -3,6 +3,7 @@ package com.soulknight.matrixai
 import android.app.Activity
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
+import android.provider.Settings
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -22,8 +23,15 @@ import com.soulknight.matrixai.capture.ScreenCaptureService
 import com.soulknight.matrixai.macro.MacroConfig
 import com.soulknight.matrixai.macro.MacroProfileStore
 import com.soulknight.matrixai.macro.MacroScheduler
+import com.soulknight.matrixai.input.MatrixAccessibilityService
 
 class MainActivity : ComponentActivity() {
+    private var accessibilityConnected by mutableStateOf(false)
+
+    override fun onResume() {
+        super.onResume()
+        accessibilityConnected = MatrixAccessibilityService.isConnected()
+    }
     private val captureLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -216,7 +224,31 @@ class MainActivity : ComponentActivity() {
                                 Modifier.fillMaxWidth().padding(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("3. Chụp màn hình", style = MaterialTheme.typography.titleLarge)
+                                Text("3. Quyền điều khiển cảm ứng", style = MaterialTheme.typography.titleLarge)
+                                Text(
+                                    if (accessibilityConnected) "AccessibilityService đã kết nối"
+                                    else "Chưa kết nối. Bạn cần tự bật dịch vụ trong Cài đặt Android.",
+                                    color = if (accessibilityConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                )
+                                Button(
+                                    onClick = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Mở cài đặt Accessibility") }
+                                Text(
+                                    "InputController đã được thêm làm cổng gửi thao tác. " +
+                                        "Macro chưa tự gửi chạm: cần cấu hình tọa độ nút và kiểm thử trên thiết bị thật. " +
+                                        "Android không bảo đảm đa chạm độc lập.",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+
+                        Card {
+                            Column(
+                                Modifier.fillMaxWidth().padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("4. Chụp màn hình", style = MaterialTheme.typography.titleLarge)
                                 Text(captureStatus)
                                 Button(
                                     onClick = {

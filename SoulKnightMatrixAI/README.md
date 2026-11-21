@@ -106,3 +106,15 @@ This connects screen capture to a reusable frame stream. It does not yet automat
 ### Integration status and safety limits
 
 The tracker and joystick gesture APIs are committed as reusable components, but are not yet connected to an in-game floating calibration overlay or a full automatic calibration sequence. A player seed point must come from a real gameplay frame, and the game must be foreground when a joystick gesture is deliberately dispatched. The current MainActivity does not provide an overlay; therefore do not treat this milestone as a one-button in-game speed scan. A follow-up milestone must add an explicit, user-visible overlay/arming flow, live tracker session lifecycle, measured start/end positions and stop-on-low-confidence behavior before automatic trials are enabled. Accessibility gestures cannot guarantee cancellation after dispatch.
+
+
+## Live player tracking and movement calibration
+
+- The live capture preview is shown in the app. Tap the centre of the player in that preview to seed the existing patch tracker; this is manual initialization, not a trained character detector.
+- Enter the virtual joystick centre in physical screen pixels and confirm that the character is in a clear area before starting.
+- The user-started calibration runner sends three bounded 450 ms joystick drags (horizontal, vertical, diagonal), tracks the selected player patch across captured frames, measures pixel displacement per elapsed frame time, and persists the resulting profile locally.
+- The capture sampling interval is now approximately 100 ms (up to about 10 FPS) to provide more observations during a trial. Actual delivered FPS depends on Android/device load.
+- Calibration stops if tracking confidence is insufficient, there are not enough newer frames, or displacement is too small. Stop prevents additional trials; an already-dispatched Android gesture may finish because AccessibilityService does not expose a reliable public cancel API.
+- The stored values are in downscaled preview pixels per second. They must be validated on-device before being used for navigation. Buff-change monitoring exists as a calculation module but is not yet connected to continuous in-game movement control.
+- No static Wiki screenshots are bundled for player tracking: a live capture from the user's actual game session is more appropriate because character appearance, room layout, UI scale and screen coordinates vary.
+

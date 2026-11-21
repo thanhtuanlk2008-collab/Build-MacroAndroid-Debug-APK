@@ -128,3 +128,13 @@ The tracker and joystick gesture APIs are committed as reusable components, but 
 - The observer sends no joystick gestures. It does not prove that a speed change came from a buff: terrain, collision, status effects, camera movement, animation, or tracking errors can affect measurements. Validate the result in a clear area and stop observation when tracking is unreliable.
 - The UI provides explicit start/stop controls. A calibrated profile and a selected player centre are required before monitoring can start.
 
+
+## Dynamic room exploration and navigation safety (2026-11-21)
+
+- `RoomScanner` creates a fresh local walkability grid for each scan and consumes semantic detections supplied by a detector. Each enemy/boss detection is associated with its nearest valid door; it no longer incorrectly labels every door as the same detected room type.
+- `RoomExplorationMemory` stores observed room fingerprints and transitions for the current run. It prioritizes uncleared enemy rooms, then boss rooms, and skips special rooms. Fingerprints are visual signatures, not fixed floor-layout IDs.
+- `RoomScanQualityEvaluator` requires a sufficiently large frame, a valid player position and at least one reliable exit detection before a scan is considered ready.
+- `RoomNavigationPlanner.plan` combines that readiness gate with A*. It returns no movement path when the scan is uncertain or the target is unreachable.
+- Unit tests cover nearest-door association, room memory priorities, scan readiness and unreachable-path rejection.
+
+**Important limitation:** these components are now implemented as tested decision/navigation primitives, but this is not yet a complete live gameplay AI. The app still needs a validated visual detector that identifies the player, enemies, special rooms, doors and walkable cells from actual Soul Knight frames. Colour similarity alone is not enough to reliably identify those semantic objects. The current dashboard does not yet connect these room observations to continuous autonomous movement. Do not assume the AI can already play Matrix unattended; first validate detections and paths against real screenshots and then perform supervised device testing.

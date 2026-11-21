@@ -57,21 +57,35 @@ class MainActivity : ComponentActivity() {
             var profileName by remember { mutableStateOf("Cấu hình mới") }
             var profiles by remember { mutableStateOf(store.profileNames()) }
             val mainHandler = remember { Handler(Looper.getMainLooper()) }
+            val inputQueue = remember {
+                InputActionQueue(
+                    controller = MatrixAccessibilityService.inputController(),
+                    onResult = { action, result ->
+                        mainHandler.post { lastEvent = "\${action.displayName}: \${result}" }
+                    }
+                )
+            }
             val scheduler = remember {
                 MacroScheduler(
                     onAction = { action ->
-                        // Compose state must only be changed on the main thread.
-                        mainHandler.post { lastEvent = "Đến lịch: ${action.displayName}" }
+                        val target = targetRef.get().forAction(action)
+                        if (target == null) {
+                            mainHandler.post { lastEvent = "\${action.displayName}: chưa cấu hình tọa độ" }
+                        } else if (!inputQueue.enqueue(action, target)) {
+                            mainHandler.post { lastEvent = "\${action.displayName}: hàng đợi từ chối thao tác" }
+                        } else {
+                            mainHandler.post { lastEvent = "Đã xếp hàng: \${action.displayName}" }
+                        }
                     },
                     onError = { action, error ->
                         mainHandler.post {
-                            lastEvent = "Lỗi callback ${action.displayName}: ${error.message ?: "không rõ"}"
+                            lastEvent = "Lỗi \${action.displayName}: \${error.message ?: "không rõ"}"
                         }
                     }
                 )
             }
             DisposableEffect(Unit) {
-                onDispose { scheduler.stop() }
+                onDispose { scheduler.stop(); inputQueue.stop() }
             }
 
             MaterialTheme {
@@ -183,7 +197,9 @@ class MainActivity : ComponentActivity() {
                                     Button(
                                         onClick = {
                                             store.save(config)
+                                            inputQueue.start()
                                             val started = scheduler.start(config)
+                                            if (!started) inputQueue.stop()
                                             macroStatus = if (started) {
                                                 "Macro đang chạy qua hàng đợi InputController"
                                             } else {
@@ -195,6 +211,7 @@ class MainActivity : ComponentActivity() {
                                     OutlinedButton(
                                         onClick = {
                                             scheduler.stop()
+                                            inputQueue.stop()
                                             macroStatus = "Macro đang dừng"
                                         },
                                         modifier = Modifier.weight(1f)
@@ -203,6 +220,7 @@ class MainActivity : ComponentActivity() {
                                 Button(
                                     onClick = {
                                         scheduler.stop()
+                                        inputQueue.stop()
                                         macroStatus = "ĐÃ DỪNG KHẨN CẤP"
                                         lastEvent = "Đã yêu cầu dừng toàn bộ tác vụ Macro"
                                     },
@@ -212,8 +230,7 @@ class MainActivity : ComponentActivity() {
                                     )
                                 ) { Text("Emergency Stop") }
                                 Text(
-                                    "Lưu ý: hiện tại ứng dụng chỉ phát sự kiện theo lịch để kiểm thử. " +
-                                        "Chưa gửi thao tác chạm vào game.",
+                                    "Macro gửi thao tác qua InputController khi Accessibility đã bật và tọa độ hợp lệ.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error
                                 )

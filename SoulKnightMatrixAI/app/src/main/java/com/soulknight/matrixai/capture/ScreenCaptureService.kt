@@ -9,6 +9,7 @@ import android.content.Intent
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.DisplayMetrics
@@ -31,7 +32,11 @@ class ScreenCaptureService : Service() {
             return START_NOT_STICKY
         }
         if (intent?.action == ACTION_START) {
-            startForeground(NOTIFICATION_ID, buildNotification())
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
             val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
             val data = if (Build.VERSION.SDK_INT >= 33) {
                 intent.getParcelableExtra(EXTRA_RESULT_DATA, Intent::class.java)
@@ -45,6 +50,12 @@ class ScreenCaptureService : Service() {
             }
             val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             projection = manager.getMediaProjection(resultCode, data)
+            projection?.registerCallback(object : MediaProjection.Callback() {
+                override fun onStop() {
+                    stopCapture()
+                    stopSelf()
+                }
+            }, null)
             startCapture()
         }
         return START_NOT_STICKY

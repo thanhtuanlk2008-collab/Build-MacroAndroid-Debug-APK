@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
                 InputActionQueue(
                     controller = MatrixAccessibilityService.inputController(),
                     onResult = { action, result ->
-                        mainHandler.post { lastEvent = "\${action.displayName}: \${result}" }
+                        mainHandler.post { lastEvent = "${action.displayName}: ${result}" }
                     }
                 )
             }
@@ -70,16 +70,16 @@ class MainActivity : ComponentActivity() {
                     onAction = { action ->
                         val target = targetRef.get().forAction(action)
                         if (target == null) {
-                            mainHandler.post { lastEvent = "\${action.displayName}: chưa cấu hình tọa độ" }
+                            mainHandler.post { lastEvent = "${action.displayName}: chưa cấu hình tọa độ" }
                         } else if (!inputQueue.enqueue(action, target)) {
-                            mainHandler.post { lastEvent = "\${action.displayName}: hàng đợi từ chối thao tác" }
+                            mainHandler.post { lastEvent = "${action.displayName}: hàng đợi từ chối thao tác" }
                         } else {
-                            mainHandler.post { lastEvent = "Đã xếp hàng: \${action.displayName}" }
+                            mainHandler.post { lastEvent = "Đã xếp hàng: ${action.displayName}" }
                         }
                     },
                     onError = { action, error ->
                         mainHandler.post {
-                            lastEvent = "Lỗi \${action.displayName}: \${error.message ?: "không rõ"}"
+                            lastEvent = "Lỗi ${action.displayName}: ${error.message ?: "không rõ"}"
                         }
                     }
                 )

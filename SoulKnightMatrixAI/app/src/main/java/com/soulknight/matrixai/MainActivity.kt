@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val store = MacroProfileStore(this)
+        val targetStore = InputTargetStore(this)
         setContent {
             var config by remember { mutableStateOf(store.load()) }
             var captureStatus by remember { mutableStateOf("Chưa cấp quyền chụp màn hình") }

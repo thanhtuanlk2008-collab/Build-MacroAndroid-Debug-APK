@@ -2,7 +2,7 @@ package com.soulknight.matrixai.navigation
 
 import com.soulknight.matrixai.vision.FrameSnapshot
 
-enum class ScanReadiness { READY, INSUFFICIENT_FRAME, PLAYER_NOT_FOUND, NO_RELIABLE_EXITS }
+enum class ScanReadiness { READY, INSUFFICIENT_FRAME, PLAYER_NOT_FOUND, NO_RELIABLE_EXITS, NO_PATH }
 
 /** Explicit readiness gate: low-information scans must not trigger automatic movement. */
 data class RoomScanQuality(

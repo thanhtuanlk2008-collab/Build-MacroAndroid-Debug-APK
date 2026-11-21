@@ -26,14 +26,16 @@ class MatrixRouteCoordinator(
         biomeTemplates: Map<MatrixBiome, ImageTemplate>,
         sirVerdantEntranceTemplate: ImageTemplate,
         biomeRegion: ScreenRegion,
-        routeRegion: ScreenRegion
+        routeRegion: ScreenRegion,
+        searchStep: Int = MatrixRouteVisionAnalyzer.DEFAULT_SEARCH_STEP
     ): PostBossRouteEvaluation {
         val vision = visionAnalyzer.analyze(
             frame = frame,
             biomeTemplates = biomeTemplates,
             sirVerdantEntranceTemplate = sirVerdantEntranceTemplate,
             biomeRegion = biomeRegion,
-            routeRegion = routeRegion
+            routeRegion = routeRegion,
+            searchStep = searchStep
         )
         val decision = routePolicy.decide(
             BossRouteContext(

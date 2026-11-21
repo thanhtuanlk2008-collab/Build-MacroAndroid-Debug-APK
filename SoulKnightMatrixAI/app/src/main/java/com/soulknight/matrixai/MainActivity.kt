@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
                                             store.save(config)
                                             val started = scheduler.start(config)
                                             macroStatus = if (started) {
-                                                "Đang chạy bộ lập lịch (chế độ kiểm thử)"
+                                                "Macro đang chạy qua hàng đợi InputController"
                                             } else {
                                                 "Không thể chạy: hãy bật ít nhất một chức năng"
                                             }
@@ -235,12 +235,26 @@ class MainActivity : ComponentActivity() {
                                     onClick = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text("Mở cài đặt Accessibility") }
-                                Text(
-                                    "InputController đã được thêm làm cổng gửi thao tác. " +
-                                        "Macro chưa tự gửi chạm: cần cấu hình tọa độ nút và kiểm thử trên thiết bị thật. " +
-                                        "Android không bảo đảm đa chạm độc lập.",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
+                                Text("Nhập tọa độ pixel của các nút trong game. Chỉ gửi thao tác sau khi Accessibility được bật.")
+                                CoordinateFields("Tấn công", attackX, attackY, { attackX = it }, { attackY = it })
+                                CoordinateFields("Kỹ năng", skillX, skillY, { skillX = it }, { skillY = it })
+                                CoordinateFields("Đổi vũ khí", weaponX, weaponY, { weaponX = it }, { weaponY = it })
+                                Button(onClick = {
+                                    fun parseTarget(x: String, y: String): InputTarget? {
+                                        val px = x.toFloatOrNull() ?: return null
+                                        val py = y.toFloatOrNull() ?: return null
+                                        return InputTarget(px, py).takeIf(InputTarget::isValid)
+                                    }
+                                    val updated = InputTargetConfig(
+                                        attack = parseTarget(attackX, attackY),
+                                        skill = parseTarget(skillX, skillY),
+                                        switchWeapon = parseTarget(weaponX, weaponY)
+                                    )
+                                    targets = updated
+                                    targetRef.set(updated)
+                                    targetStore.save(updated)
+                                    lastEvent = "Đã lưu tọa độ điều khiển"
+                                }, modifier = Modifier.fillMaxWidth()) { Text("Lưu tọa độ") }
                             }
                         }
 
@@ -276,6 +290,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CoordinateFields(title: String, x: String, y: String, onX: (String) -> Unit, onY: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(value = x, onValueChange = onX, label = { Text("X") }, modifier = Modifier.weight(1f), singleLine = true)
+            OutlinedTextField(value = y, onValueChange = onY, label = { Text("Y") }, modifier = Modifier.weight(1f), singleLine = true)
         }
     }
 }

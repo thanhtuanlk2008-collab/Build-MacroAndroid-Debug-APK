@@ -89,3 +89,9 @@ Remaining work:
 - Add/collect reference crops for Glacier, Relics, other biomes and the Sir Verdant entrance.
 - Validate matching against animation, scaling and visual effects.
 - Connect the detected entrance to GridMap/A* and a separately verified navigation/input controller.
+
+## Screen-frame delivery
+
+The MediaProjection service now converts approved RGBA frames into bounded-size ARGB `FrameSnapshot` objects (maximum width 480, approximately 5 frames/second) on a dedicated handler thread. `FrameSnapshotStore` exposes the latest frame to in-process vision consumers, and the dashboard displays the incoming frame dimensions.
+
+This connects screen capture to a reusable frame stream. It does not yet automatically call the route analyzer: game-specific reference templates and calibrated screen regions are still required, and the user must grant Android screen-capture permission each session.

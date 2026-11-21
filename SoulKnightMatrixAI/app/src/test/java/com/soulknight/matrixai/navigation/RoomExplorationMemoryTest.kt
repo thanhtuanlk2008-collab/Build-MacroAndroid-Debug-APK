@@ -11,6 +11,8 @@ class RoomExplorationMemoryTest {
         memory.observe(RememberedRoom(2L, RoomKind.SPECIAL, 0.99f))
         memory.observe(RememberedRoom(3L, RoomKind.BOSS, 0.90f))
         memory.observe(RememberedRoom(4L, RoomKind.ENEMY, 0.72f))
+        memory.connectRooms(1L, 3L)
+        memory.connectRooms(1L, 4L)
 
         assertEquals(4L, memory.nextRoom(1L)?.fingerprint)
     }

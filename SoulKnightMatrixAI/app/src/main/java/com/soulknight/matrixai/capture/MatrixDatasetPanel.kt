@@ -43,10 +43,10 @@ fun MatrixDatasetPanel() {
 
     Card {
         Column(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("5. Thu thập ảnh khi đổi phòng")
+            Text("Thu thập ảnh phòng")
             Text("Bộ lọc so sánh ảnh, chờ 3 khung hình ổn định rồi lưu một ảnh. Đây là phát hiện thay đổi hình ảnh, chưa xác nhận chắc chắn đó là phòng mới.")
             Text(status)
             Text("Ảnh đã lưu trong phiên cài đặt này: $savedCount")

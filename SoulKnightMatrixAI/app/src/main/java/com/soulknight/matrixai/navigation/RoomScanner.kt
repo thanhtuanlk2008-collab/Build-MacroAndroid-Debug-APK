@@ -40,14 +40,19 @@ class RoomScanner {
             val point = GridPoint(x, y)
             map[point] = if (point in walkableCells) TileType.WALKABLE else TileType.BLOCKED
         }
+        // Associate each semantic detection with its nearest valid door.
+        // The previous Cartesian-product mapping could incorrectly label every door
+        // as an enemy/boss exit when only one such room had been detected.
+        val validDoors = doorPositions.distinct().filter { map.contains(it) }
         val candidates = detections.asSequence()
             .filter { it.confidence >= MIN_DETECTION_CONFIDENCE }
             .filter { it.kind != RoomKind.SPECIAL && it.kind != RoomKind.UNKNOWN }
-            .flatMap { detection ->
-                doorPositions.filter { map.contains(it) }.map {
-                    RoomCandidate(detection.kind, it, detection.confidence)
-                }
-            }.distinctBy { it.doorPosition to it.kind }.toList()
+            .mapNotNull { detection ->
+                val nearestDoor = validDoors.minByOrNull { distance(detection.gridPosition, it) }
+                nearestDoor?.let { RoomCandidate(detection.kind, it, detection.confidence) }
+            }
+            .distinctBy { it.doorPosition to it.kind }
+            .toList()
         val selected = candidates.sortedWith(
             compareBy<RoomCandidate> { priority(it.kind) }
                 .thenByDescending { it.confidence }

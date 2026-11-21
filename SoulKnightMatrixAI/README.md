@@ -29,12 +29,15 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`
 - [x] Main-thread dispatch for Compose state updates from scheduler callbacks
 - [x] Unit tests for MacroConfig and MacroScheduler
 - [x] Robolectric tests for Android SharedPreferences profile persistence
-- [ ] InputController to send game touch gestures
+- [x] Permission-gated InputController and user-enabled AccessibilityService registration
+- [x] Dashboard link to Android Accessibility settings and live service-connected status
+- [ ] Connect Macro/AI action plans to configured screen targets through InputController
+- [ ] Device test for tap/hold gesture dispatch
 - [ ] Character and weapon recognition
 - [ ] Device test for joystick plus action-button multitouch
 
 ## Important implementation boundary
 
-The current MacroScheduler emits timed events only. It does **not** inject touch input into Soul Knight. The UI explicitly identifies this as test mode. A real InputController must be implemented and tested separately with Android's permission model; independent simultaneous touch streams are not guaranteed by AccessibilityService.
+The current MacroScheduler emits timed events only. It does **not** inject touch input into Soul Knight. The UI explicitly identifies this as test mode. An InputController gateway and AccessibilityService bridge now exist. The user must explicitly enable the service in Android Settings. MacroScheduler is still event-only and is not yet wired to screen coordinates; no game action is sent automatically. The service supports a single dispatched gesture path, not independent simultaneous multitouch. Android's AccessibilityService API has no dedicated cancel-current-gesture method, so emergency stop currently stops scheduling but cannot promise cancellation of an already-dispatched gesture.
 
 Screen capture requires the user to approve Android's MediaProjection prompt. The current capture service validates the capture lifecycle but does not yet expose processed frames to a semantic game-recognition model.

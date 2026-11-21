@@ -3,6 +3,12 @@ package com.macro.app.service
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.content.Intent
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.view.InputDevice
+import androidx.annotation.RequiresApi
 import android.graphics.Color
 import android.graphics.Path
 import android.graphics.PixelFormat
@@ -26,11 +32,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.hypot
+
+data class RealtimeProbeStatus(
+    val active: Boolean = false,
+    val eventCount: Long = 0L,
+    val lastAction: String = "Chưa chạy kiểm thử",
+    val message: String = "Chưa đăng ký nguồn cảm ứng."
+)
 
 class MacroAccessibilityService : AccessibilityService() {
 
     companion object {
+        private val _realtimeProbeStatus = MutableStateFlow(RealtimeProbeStatus())
+        val realtimeProbeStatus: StateFlow<RealtimeProbeStatus> = _realtimeProbeStatus.asStateFlow()
+
         @Volatile
         var instance: MacroAccessibilityService? = null
             private set
@@ -51,6 +70,10 @@ class MacroAccessibilityService : AccessibilityService() {
     private var lastY = 0f
     private var downTime = 0L
     private var multiTouch = false
+    private val probeHandler = Handler(Looper.getMainLooper())
+    private var probeEventCount = 0L
+    private var probeLastUiUpdateMs = 0L
+    private val stopProbeRunnable = Runnable { stopRealtimeMotionProbe("Đã tự dừng sau 5 giây.") }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -350,11 +373,87 @@ class MacroAccessibilityService : AccessibilityService() {
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
+    /**
+     * Opt-in diagnostic only. Android 14+ routes the requested touchscreen
+     * MotionEvents to this service; those events are not delivered onward by
+     * the framework while this source is registered. Auto-stops after 5 seconds.
+     * Do not enable over another app or during normal gameplay.
+     */
+    fun startRealtimeMotionProbe(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            _realtimeProbeStatus.value = RealtimeProbeStatus(
+                message = "Không hỗ trợ: cần Android 14 trở lên."
+            )
+            return false
+        }
+
+        return try {
+            stopRealtimeMotionProbe("Đang khởi tạo kiểm thử.")
+            probeEventCount = 0L
+            probeLastUiUpdateMs = 0L
+            val info = serviceInfo
+            info.setMotionEventSources(InputDevice.SOURCE_TOUCHSCREEN)
+            serviceInfo = info
+            _realtimeProbeStatus.value = RealtimeProbeStatus(
+                active = true,
+                eventCount = 0L,
+                lastAction = "Đang chờ sự kiện",
+                message = "Đang kiểm thử tối đa 5 giây. Cảm ứng có thể tạm thời không tới ứng dụng."
+            )
+            probeHandler.postDelayed(stopProbeRunnable, 5_000L)
+            true
+        } catch (error: Exception) {
+            stopRealtimeMotionProbe("Không thể bật probe: ${error.message ?: "lỗi không xác định"}.")
+            false
+        }
+    }
+
+    fun stopRealtimeMotionProbe(reason: String = "Đã dừng kiểm thử.") {
+        probeHandler.removeCallbacks(stopProbeRunnable)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            runCatching {
+                val info = serviceInfo
+                info.setMotionEventSources(0)
+                serviceInfo = info
+            }
+        }
+        _realtimeProbeStatus.value = RealtimeProbeStatus(
+            active = false,
+            eventCount = probeEventCount,
+            lastAction = _realtimeProbeStatus.value.lastAction,
+            message = reason
+        )
+    }
+
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    override fun onMotionEvent(event: MotionEvent) {
+        if (!_realtimeProbeStatus.value.active) return
+        probeEventCount += 1L
+        val now = SystemClock.elapsedRealtime()
+        if (now - probeLastUiUpdateMs >= 100L) {
+            probeLastUiUpdateMs = now
+            val actionName = when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> "DOWN"
+                MotionEvent.ACTION_MOVE -> "MOVE"
+                MotionEvent.ACTION_UP -> "UP"
+                MotionEvent.ACTION_CANCEL -> "CANCEL"
+                MotionEvent.ACTION_POINTER_DOWN -> "POINTER_DOWN"
+                MotionEvent.ACTION_POINTER_UP -> "POINTER_UP"
+                else -> "ACTION_${event.actionMasked}"
+            }
+            _realtimeProbeStatus.value = _realtimeProbeStatus.value.copy(
+                eventCount = probeEventCount,
+                lastAction = actionName
+            )
+        }
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // Does not inspect screen text, passwords, or private view hierarchies.
     }
 
     override fun onInterrupt() {
+        stopRealtimeMotionProbe("Đã dừng do Accessibility bị gián đoạn.")
         MacroEngine.emergencyStop("AccessibilityService bị gián đoạn bởi hệ thống.")
         removeTouchRecordingOverlay()
     }
@@ -367,6 +466,7 @@ class MacroAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        stopRealtimeMotionProbe("Đã dừng khi service đóng.")
         removeTouchRecordingOverlay()
         serviceScope.cancel()
         MacroEngine.setAccessibilityConnected(false)

@@ -18,8 +18,10 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`
 - [x] Android app shell with Jetpack Compose and Material 3
 - [x] User-mediated MediaProjection foreground service
 - [x] Frame data model and lightweight RGB frame statistics (baseline, not semantic AI)
-- [x] Matrix finite-state machine
+- [x] Matrix finite-state machine, including a special-route-check state
 - [x] Grid A* pathfinder
+- [x] Post-boss X-5 Sir Verdant route decision policy with Glacier/Relics exclusions
+- [x] Unit tests for Sir Verdant route decisions
 - [x] Macro configuration model with interval validation
 - [x] SharedPreferences persistence for the default macro configuration
 - [x] Multiple named macro profiles (save, load, delete)
@@ -31,17 +33,29 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`
 - [x] Robolectric tests for Android SharedPreferences profile persistence
 - [x] Permission-gated InputController and user-enabled AccessibilityService registration
 - [x] Dashboard link to Android Accessibility settings and live service-connected status
+- [ ] Visual biome recognition (Glacier / Relics / other)
+- [ ] Visual recognition and tracking of the Sir Verdant entrance
+- [ ] Connect route decisions to GridMap/A* navigation and live game input
 - [ ] Connect Macro/AI action plans to configured screen targets through InputController
 - [ ] Device test for tap/hold gesture dispatch
 - [ ] Character and weapon recognition
 - [ ] Device test for joystick plus action-button multitouch
+
+## Sir Verdant route policy
+
+After a boss is confirmed defeated in room X-5:
+- Glacier and Relics always skip the Sir Verdant side room and continue the normal route.
+- In other confirmed biomes, the AI waits for a completed route scan and always prioritizes a Sir Verdant route when its detection confidence is at least 0.80.
+- If a completed scan finds no sufficiently confident Sir Verdant route, the policy selects the normal route.
+- If the biome is unknown or route scanning is incomplete, the policy waits instead of guessing.
+
+Implementation: `matrix/SpecialRoomRoutePolicy.kt`. The policy is a deterministic decision layer and is unit-tested. It consumes biome and route detections; it does not yet visually recognize the biome/entrance or issue movement commands. The state machine now includes `SPECIAL_ROUTE_CHECK`, but live vision-to-navigation wiring remains a later step.
 
 ## Important implementation boundary
 
 The current MacroScheduler emits timed events only. It does **not** inject touch input into Soul Knight. The UI explicitly identifies this as test mode. An InputController gateway and AccessibilityService bridge now exist. The user must explicitly enable the service in Android Settings. MacroScheduler is still event-only and is not yet wired to screen coordinates; no game action is sent automatically. The service supports a single dispatched gesture path, not independent simultaneous multitouch. Android's AccessibilityService API has no dedicated cancel-current-gesture method, so emergency stop currently stops scheduling but cannot promise cancellation of an already-dispatched gesture.
 
 Screen capture requires the user to approve Android's MediaProjection prompt. The current capture service validates the capture lifecycle but does not yet expose processed frames to a semantic game-recognition model.
-
 
 ## InputController – trạng thái tích hợp
 

@@ -6,22 +6,31 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.view.WindowManager
 import android.hardware.display.DisplayManager
 import androidx.core.app.NotificationCompat
-import com.soulknight.matrixai.R
+import com.soulknight.matrixai.vision.FrameSnapshot
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 class ScreenCaptureService : Service() {
     private var projection: MediaProjection? = null
     private var imageReader: ImageReader? = null
     private var virtualDisplay: android.hardware.display.VirtualDisplay? = null
+    private var captureThread: HandlerThread? = null
+    private var captureHandler: Handler? = null
+    private var lastFrameAtMillis = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -68,10 +77,21 @@ class ScreenCaptureService : Service() {
         val width = metrics.widthPixels
         val height = metrics.heightPixels
         val density = metrics.densityDpi
+        captureThread = HandlerThread("MatrixFrameProcessor").also { it.start() }
+        captureHandler = Handler(captureThread!!.looper)
         imageReader = ImageReader.newInstance(width, height, android.graphics.PixelFormat.RGBA_8888, 2)
         imageReader?.setOnImageAvailableListener({ reader ->
-            reader.acquireLatestImage()?.close()
-        }, null)
+            val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+            try {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastFrameAtMillis >= FRAME_INTERVAL_MS) {
+                    lastFrameAtMillis = now
+                    imageToSnapshot(image)?.let(FrameSnapshotStore::publish)
+                }
+            } finally {
+                image.close()
+            }
+        }, captureHandler)
         virtualDisplay = projection?.createVirtualDisplay(
             "SoulKnightMatrixAI-Capture",
             width,
@@ -80,8 +100,39 @@ class ScreenCaptureService : Service() {
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
             imageReader?.surface,
             null,
-            null
+            captureHandler
         )
+    }
+
+    /** Converts RGBA_8888 into a bounded-size ARGB frame, respecting row/pixel stride. */
+    private fun imageToSnapshot(image: Image): FrameSnapshot? {
+        val plane = image.planes.firstOrNull() ?: return null
+        val buffer = plane.buffer
+        val pixelStride = plane.pixelStride
+        val rowStride = plane.rowStride
+        if (pixelStride < 4 || rowStride <= 0) return null
+
+        val scale = max(1, (image.width + MAX_FRAME_WIDTH - 1) / MAX_FRAME_WIDTH)
+        val outWidth = (image.width.toFloat() / scale).roundToInt().coerceAtLeast(1)
+        val outHeight = (image.height.toFloat() / scale).roundToInt().coerceAtLeast(1)
+        val pixels = IntArray(outWidth * outHeight)
+        val base = buffer.position()
+
+        for (outY in 0 until outHeight) {
+            val sourceY = (outY * scale).coerceAtMost(image.height - 1)
+            for (outX in 0 until outWidth) {
+                val sourceX = (outX * scale).coerceAtMost(image.width - 1)
+                val index = base + sourceY * rowStride + sourceX * pixelStride
+                if (index < 0 || index + 3 >= buffer.limit()) return null
+                val red = buffer.get(index).toInt() and 0xff
+                val green = buffer.get(index + 1).toInt() and 0xff
+                val blue = buffer.get(index + 2).toInt() and 0xff
+                val alpha = buffer.get(index + 3).toInt() and 0xff
+                pixels[outY * outWidth + outX] =
+                    (alpha shl 24) or (red shl 16) or (green shl 8) or blue
+            }
+        }
+        return FrameSnapshot(outWidth, outHeight, SystemClock.elapsedRealtime(), pixels)
     }
 
     private fun buildNotification(): Notification {
@@ -94,7 +145,7 @@ class ScreenCaptureService : Service() {
         }
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle("Soul Knight Matrix AI")
-            .setContentText("Dịch vụ chụp màn hình đang hoạt động")
+            .setContentText("Đang truyền khung hình đã được cấp quyền vào bộ phân tích")
             .setSmallIcon(android.R.drawable.ic_menu_view)
             .setOngoing(true)
             .build()
@@ -103,10 +154,15 @@ class ScreenCaptureService : Service() {
     private fun stopCapture() {
         virtualDisplay?.release()
         virtualDisplay = null
+        imageReader?.setOnImageAvailableListener(null, null)
         imageReader?.close()
         imageReader = null
+        captureThread?.quitSafely()
+        captureThread = null
+        captureHandler = null
         projection?.stop()
         projection = null
+        FrameSnapshotStore.clear()
         stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
@@ -121,5 +177,7 @@ class ScreenCaptureService : Service() {
         const val EXTRA_RESULT_CODE = "capture_result_code"
         const val EXTRA_RESULT_DATA = "capture_result_data"
         private const val NOTIFICATION_ID = 4101
+        private const val MAX_FRAME_WIDTH = 480
+        private const val FRAME_INTERVAL_MS = 200L
     }
 }

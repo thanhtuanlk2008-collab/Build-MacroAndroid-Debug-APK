@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.macro.app.model.Macro
 import com.macro.app.ui.MacroViewModel
+import com.macro.app.service.MacroAccessibilityService
 import com.macro.app.ui.editor.MacroEditorScreen
 import com.macro.app.ui.home.HomeScreen
 import com.macro.app.ui.library.MacroLibraryScreen
@@ -84,6 +85,7 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
     val floatingActive by viewModel.floatingActive.collectAsState()
     val editingMacro by viewModel.editingMacro.collectAsState()
     val isAccessibilityConnected by viewModel.isAccessibilityConnected.collectAsState()
+    val realtimeProbe by MacroAccessibilityService.realtimeProbeStatus.collectAsState()
 
     var currentTab by remember { mutableStateOf(NavTab.HOME) }
 
@@ -192,7 +194,9 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
                         telemetry = telemetry,
                         currentSpeed = speed,
                         onRunTouchConflictTestMacro = { viewModel.playMacro(it) },
-                        onStopMacro = { viewModel.stopMacro() }
+                        onStopMacro = { viewModel.stopMacro() },
+                        realtimeProbe = realtimeProbe,
+                        onStartRealtimeProbe = { MacroAccessibilityService.instance?.startRealtimeMotionProbe() }
                     )
 
                     NavTab.SETTINGS -> SettingsScreen(

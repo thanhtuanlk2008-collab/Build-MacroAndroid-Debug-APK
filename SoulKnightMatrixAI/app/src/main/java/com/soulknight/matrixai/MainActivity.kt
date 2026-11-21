@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.soulknight.matrixai.capture.ScreenCaptureService
 import com.soulknight.matrixai.macro.MacroConfig
-import com.soulknight.matrixai.macro.MacroConfigStore
+import com.soulknight.matrixai.macro.MacroProfileStore
 import com.soulknight.matrixai.macro.MacroScheduler
 
 class MainActivity : ComponentActivity() {
@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val store = MacroConfigStore(this)
+        val store = MacroProfileStore(this)
         setContent {
             var config by remember { mutableStateOf(store.load()) }
             var captureStatus by remember { mutableStateOf("Chưa cấp quyền chụp màn hình") }
@@ -150,7 +150,7 @@ class MainActivity : ComponentActivity() {
                                             profileName = name
                                             macroStatus = "Đã tải cấu hình: $name"
                                         }) { Text("Tải") }
-                                        if (name != MacroConfigStore.DEFAULT_PROFILE) {
+                                        if (name != MacroProfileStore.DEFAULT_PROFILE) {
                                             TextButton(onClick = {
                                                 store.deleteProfile(name)
                                                 profiles = store.profileNames()

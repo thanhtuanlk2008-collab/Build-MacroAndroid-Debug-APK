@@ -368,12 +368,14 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
+                        com.soulknight.matrixai.capture.MatrixDatasetPanel()
+
                         Card {
                             Column(
                                 Modifier.fillMaxWidth().padding(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("5. Hiệu chỉnh tốc độ di chuyển", style = MaterialTheme.typography.titleLarge)
+                                Text("6. Hiệu chỉnh tốc độ di chuyển", style = MaterialTheme.typography.titleLarge)
                                 Text("Chạm vào tâm nhân vật trên ảnh xem trước. Tọa độ này thuộc ảnh đã thu nhỏ, không phải tọa độ màn hình.")
                                 val currentFrame = previewFrame
                                 if (currentFrame != null) {

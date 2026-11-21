@@ -1,0 +1,39 @@
+name: Build Matrix AI Vision Pipeline
+
+on:
+  push:
+    branches:
+      - feature/matrix-ai-computer-vision-pipeline
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Android SDK
+        run: |
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
+          yes | "$SDKMANAGER" --licenses || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Setup Gradle
+        run: |
+          curl -L https://services.gradle.org/distributions/gradle-8.10.2-bin.zip -o gradle.zip
+          unzip -q gradle.zip -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.10.2/bin" >> "$GITHUB_PATH"
+      - name: Compile debug APK
+        working-directory: MacroAndroid_GitHub_Actions_Ready/MacroAndroid
+        run: gradle assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: matrix-ai-vision-pipeline-debug
+          path: MacroAndroid_GitHub_Actions_Ready/MacroAndroid/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 7

@@ -5,7 +5,6 @@ import com.soulknight.matrixai.vision.FrameSnapshot
 import com.soulknight.matrixai.vision.PlayerPositionTracker
 import com.soulknight.matrixai.vision.TrackedPlayerPosition
 import kotlin.math.abs
-import kotlin.math.max
 
 /**
  * Passive, user-started observer. It does not send touch input; it measures
@@ -64,13 +63,20 @@ class MovementAdaptiveSession(
         previous = current
         if (from == null) return
         val elapsed = current.timestampMillis - from.timestampMillis
-        if (elapsed !in MIN_SAMPLE_MILLIS..MAX_SAMPLE_MILLIS) return
+        if (elapsed < MIN_SAMPLE_MILLIS) return
+        if (elapsed > MAX_SAMPLE_MILLIS) {
+            previous = current
+            return
+        }
         val dx = current.x - from.x
         val dy = current.y - from.y
         val absX = abs(dx).toFloat()
         val absY = abs(dy).toFloat()
         val distance = kotlin.math.hypot(absX, absY)
-        if (distance < MIN_DISPLACEMENT_PIXELS) return
+        if (distance < MIN_DISPLACEMENT_PIXELS) {
+            previous = current
+            return
+        }
 
         val direction = when {
             absX >= absY * DIAGONAL_RATIO && absY >= absX * DIAGONAL_RATIO ->
@@ -83,6 +89,7 @@ class MovementAdaptiveSession(
             current.x.toFloat(), current.y.toFloat(),
             elapsed, direction
         )
+        previous = current
         val old = profile
         val next = monitor.updateIfChanged(old, sample, current.timestampMillis)
         if (next !== old && next.updatedAtMillis != old.updatedAtMillis) {

@@ -95,3 +95,14 @@ Remaining work:
 The MediaProjection service now converts approved RGBA frames into bounded-size ARGB `FrameSnapshot` objects (maximum width 480, approximately 5 frames/second) on a dedicated handler thread. `FrameSnapshotStore` exposes the latest frame to in-process vision consumers, and the dashboard displays the incoming frame dimensions.
 
 This connects screen capture to a reusable frame stream. It does not yet automatically call the route analyzer: game-specific reference templates and calibrated screen regions are still required, and the user must grant Android screen-capture permission each session.
+
+## Player tracking and bounded joystick input (2026-11-21)
+
+- `PlayerPositionTracker` stores a small image patch around a user-selected player centre and searches locally in subsequent captured frames. It returns a confidence score and timestamp; low-confidence matches are rejected. This is a lightweight tracking primitive, not a trained character detector, and animated effects or camera changes can cause tracking loss.
+- `InputController.swipe` adds a single path gesture through the user-enabled AccessibilityService.
+- `JoystickController` converts a normalized direction into a bounded joystick drag. Calibration gestures are limited to 80–600 ms and an 8–180 px radius, with endpoint checks against supplied screen dimensions.
+- Unit tests cover patch tracking on synthetic frames and rejection of out-of-bounds/overlong joystick requests.
+
+### Integration status and safety limits
+
+The tracker and joystick gesture APIs are committed as reusable components, but are not yet connected to an in-game floating calibration overlay or a full automatic calibration sequence. A player seed point must come from a real gameplay frame, and the game must be foreground when a joystick gesture is deliberately dispatched. The current MainActivity does not provide an overlay; therefore do not treat this milestone as a one-button in-game speed scan. A follow-up milestone must add an explicit, user-visible overlay/arming flow, live tracker session lifecycle, measured start/end positions and stop-on-low-confidence behavior before automatic trials are enabled. Accessibility gestures cannot guarantee cancellation after dispatch.

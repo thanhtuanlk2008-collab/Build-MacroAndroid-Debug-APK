@@ -41,6 +41,7 @@ import com.soulknight.matrixai.vision.FrameSnapshot
 import com.soulknight.matrixai.movement.MovementCalibrationRunner
 import com.soulknight.matrixai.movement.MovementProfile
 import com.soulknight.matrixai.movement.MovementProfileStore
+import com.soulknight.matrixai.movement.MovementAdaptiveSession
 
 class MainActivity : ComponentActivity() {
     private var accessibilityConnected by mutableStateOf(false)
@@ -87,6 +88,8 @@ class MainActivity : ComponentActivity() {
             var safeCalibrationArea by remember { mutableStateOf(false) }
             var movementStatus by remember { mutableStateOf("Chưa hiệu chỉnh tốc độ") }
             var movementProfile by remember { mutableStateOf(movementProfileStore.load()) }
+            var adaptiveSession by remember { mutableStateOf<MovementAdaptiveSession?>(null) }
+            var adaptiveStatus by remember { mutableStateOf("Chưa bật theo dõi buff") }
             var macroStatus by remember { mutableStateOf("Macro đang dừng") }
             var lastEvent by remember { mutableStateOf("Chưa có sự kiện") }
             var profileName by remember { mutableStateOf("Cấu hình mới") }
@@ -139,7 +142,7 @@ class MainActivity : ComponentActivity() {
                 onDispose { scheduler.stop(); inputQueue.stop() }
             }
             DisposableEffect(Unit) {
-                onDispose { calibrationRunner.stop() }
+                onDispose { calibrationRunner.stop(); adaptiveSession?.stop() }
             }
             DisposableEffect(Unit) {
                 val frameListener: (com.soulknight.matrixai.vision.FrameSnapshot) -> Unit = { frame ->
@@ -423,6 +426,52 @@ class MainActivity : ComponentActivity() {
                                     onClick = { calibrationRunner.stop() },
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text("Dừng hiệu chỉnh") }
+                                Divider()
+                                Text("Theo dõi buff tốc độ", style = MaterialTheme.typography.titleMedium)
+                                Text(adaptiveStatus, style = MaterialTheme.typography.bodySmall)
+                                Button(
+                                    enabled = previewFrame != null && movementProfile.confidence > 0f &&
+                                        playerCenterX.toIntOrNull() != null && playerCenterY.toIntOrNull() != null &&
+                                        adaptiveSession == null,
+                                    onClick = {
+                                        val px = playerCenterX.toIntOrNull()
+                                        val py = playerCenterY.toIntOrNull()
+                                        if (px == null || py == null) {
+                                            adaptiveStatus = "Hãy chạm chọn tâm nhân vật trên ảnh xem trước."
+                                        } else {
+                                            val session = MovementAdaptiveSession(
+                                                initialProfile = movementProfile,
+                                                playerCenterX = px,
+                                                playerCenterY = py,
+                                                onProfileChanged = { updated, _ ->
+                                                    mainHandler.post {
+                                                        movementProfile = updated
+                                                        movementProfileStore.save(updated)
+                                                    }
+                                                },
+                                                onStatus = { status ->
+                                                    mainHandler.post { adaptiveStatus = status }
+                                                }
+                                            )
+                                            adaptiveSession = session
+                                            if (!session.start()) adaptiveSession = null
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Bật theo dõi buff tự động") }
+                                OutlinedButton(
+                                    enabled = adaptiveSession != null,
+                                    onClick = {
+                                        adaptiveSession?.stop()
+                                        adaptiveSession = null
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Dừng theo dõi buff") }
+                                Text(
+                                    "Chế độ này không tự chạm joystick. AI theo dõi chuyển động tự nhiên khi bạn chơi, so sánh tốc độ đo được với hồ sơ đã hiệu chỉnh và lưu lại khi phát hiện thay đổi đủ lớn. Vật cản, hiệu ứng hình ảnh hoặc mất dấu có thể làm phép đo sai; hãy dừng nếu nhân vật không được theo dõi chính xác.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
                                 Text(
                                     "AI thực hiện 3 lượt joystick ngắn, lần lượt ngang, dọc và chéo. Tốc độ được đo trên ảnh chụp khoảng 10 FPS; nếu nhân vật không di chuyển rõ, phép đo sẽ bị từ chối.",
                                     style = MaterialTheme.typography.bodySmall,

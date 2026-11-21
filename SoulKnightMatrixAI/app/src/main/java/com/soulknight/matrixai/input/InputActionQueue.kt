@@ -56,11 +56,25 @@ class InputActionQueue(
         if (stopped.get() || dispatching || pending.isEmpty()) return
         val request = pending.removeFirst()
         dispatching = true
-        controller.tap(request.target.x, request.target.y) { result ->
-            onResult(request.action, result)
-            synchronized(lock) {
-                dispatching = false
-                dispatchNextLocked()
+        try {
+            controller.tap(request.target.x, request.target.y) { result ->
+                try {
+                    onResult(request.action, result)
+                } finally {
+                    synchronized(lock) {
+                        dispatching = false
+                        dispatchNextLocked()
+                    }
+                }
+            }
+        } catch (failure: RuntimeException) {
+            try {
+                onResult(request.action, InputResult.Failed(failure.message ?: "Input dispatch failed"))
+            } finally {
+                synchronized(lock) {
+                    dispatching = false
+                    dispatchNextLocked()
+                }
             }
         }
     }

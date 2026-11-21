@@ -6,10 +6,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Single gateway for app-generated touch gestures.
- *
- * Every gesture is submitted through the user-enabled MatrixAccessibilityService.
- * Android may cancel an in-flight gesture when a new gesture is dispatched; this
- * API deliberately does not promise independent simultaneous multitouch streams.
+ * Gestures are submitted only through the user-enabled AccessibilityService.
  */
 class InputController internal constructor(
     private val serviceProvider: () -> MatrixAccessibilityService?
@@ -18,30 +15,35 @@ class InputController internal constructor(
 
     fun isAvailable(): Boolean = serviceProvider() != null
 
-    fun tap(x: Float, y: Float, callback: (InputResult) -> Unit = {}): Long {
-        return dispatch(x, y, TAP_DURATION_MS, callback)
-    }
+    fun tap(x: Float, y: Float, callback: (InputResult) -> Unit = {}): Long =
+        dispatchPath(x, y, x + 0.1f, y + 0.1f, TAP_DURATION_MS, callback)
 
-    fun press(
-        x: Float,
-        y: Float,
+    fun press(x: Float, y: Float, durationMs: Long, callback: (InputResult) -> Unit = {}): Long =
+        dispatchPath(x, y, x + 0.1f, y + 0.1f, durationMs, callback)
+
+    /** Performs one bounded swipe; callers must validate target bounds for the device. */
+    fun swipe(
+        startX: Float,
+        startY: Float,
+        endX: Float,
+        endY: Float,
         durationMs: Long,
         callback: (InputResult) -> Unit = {}
+    ): Long = dispatchPath(startX, startY, endX, endY, durationMs, callback)
+
+    private fun dispatchPath(
+        startX: Float,
+        startY: Float,
+        endX: Float,
+        endY: Float,
+        durationMs: Long,
+        callback: (InputResult) -> Unit
     ): Long {
         if (durationMs !in MIN_GESTURE_DURATION_MS..MAX_GESTURE_DURATION_MS) {
             callback(InputResult.InvalidDuration)
             return -1L
         }
-        return dispatch(x, y, durationMs, callback)
-    }
-
-    private fun dispatch(
-        x: Float,
-        y: Float,
-        durationMs: Long,
-        callback: (InputResult) -> Unit
-    ): Long {
-        if (!x.isFinite() || !y.isFinite() || x < 0f || y < 0f) {
+        if (listOf(startX, startY, endX, endY).any { !it.isFinite() || it < 0f }) {
             callback(InputResult.InvalidCoordinates)
             return -1L
         }
@@ -51,15 +53,14 @@ class InputController internal constructor(
             return -1L
         }
 
-        val id = requestSequence.incrementAndGet()
         val path = Path().apply {
-            moveTo(x, y)
-            lineTo(x + 0.1f, y + 0.1f)
+            moveTo(startX, startY)
+            lineTo(endX, endY)
         }
         val gesture = GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0L, durationMs))
             .build()
-
+        val id = requestSequence.incrementAndGet()
         val accepted = service.dispatchMatrixGesture(gesture) { completed ->
             callback(if (completed) InputResult.Dispatched else InputResult.Cancelled)
         }
@@ -67,7 +68,7 @@ class InputController internal constructor(
         return id
     }
 
-    /** Cancels the current accessibility gesture, if one is active. */
+    /** Android AccessibilityService has no public API to cancel an in-flight gesture. */
     fun cancelCurrentGesture(): Boolean = serviceProvider()?.cancelMatrixGesture() ?: false
 
     companion object {

@@ -181,41 +181,9 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text("02 · Nhận diện nhân vật", style = MaterialTheme.typography.titleLarge)
-                                Text(
-                                    "Tự tìm vùng hình ảnh giống nhân vật trên màn hình, không yêu cầu chọn tọa độ ban đầu.",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                                com.soulknight.matrixai.vision.PlayerAutoDetectionPanel()
-                            }
-                        }
+                        com.soulknight.matrixai.vision.PlayerAutoDetectionPanel()
 
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text("03 · Dữ liệu nhận diện", style = MaterialTheme.typography.titleLarge)
-                                Text(
-                                    "Thu thập ảnh phòng để bổ sung dữ liệu màu sắc và họa tiết của các ô sàn.",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                                com.soulknight.matrixai.capture.MatrixDatasetPanel()
-                            }
-                        }
+                        com.soulknight.matrixai.capture.MatrixDatasetPanel()
 
                         Spacer(Modifier.height(4.dp))
                         Text(

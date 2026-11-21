@@ -36,6 +36,7 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.macro.app.engine.PlaybackTelemetry
+import com.macro.app.service.RealtimeProbeStatus
 import com.macro.app.model.ActionType
 import com.macro.app.model.GameCategory
 import com.macro.app.model.Macro
@@ -51,7 +52,9 @@ fun TestingDashboardScreen(
     telemetry: PlaybackTelemetry,
     currentSpeed: Float,
     onRunTouchConflictTestMacro: (Macro) -> Unit,
-    onStopMacro: () -> Unit
+    onStopMacro: () -> Unit,
+    realtimeProbe: RealtimeProbeStatus,
+    onStartRealtimeProbe: () -> Unit
 ) {
     var activePointers by remember { mutableIntStateOf(0) }
     var totalHumanEvents by remember { mutableIntStateOf(0) }
@@ -102,6 +105,45 @@ fun TestingDashboardScreen(
                             color = GamingColors.CrimsonRed
                         )
                     }
+                }
+            }
+        }
+
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = GamingColors.ElevatedCard),
+                border = BorderStroke(1.dp, GamingColors.CrimsonRed.copy(alpha = 0.55f)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "THỬ NGHIỆM REAL-TIME MOTION EVENT (ANDROID 14+)",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = GamingColors.CrimsonRed
+                    )
+                    Text(
+                        text = "Chỉ đo số lượng và loại sự kiện trong tối đa 5 giây; không lưu tọa độ. Cảnh báo: Android có thể không chuyển tiếp các sự kiện cảm ứng đã đăng ký tới ứng dụng bên dưới. Chỉ thử khi đang ở màn hình kiểm thử này, không bật khi chơi game.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GamingColors.TextSecondary
+                    )
+                    Button(
+                        onClick = onStartRealtimeProbe,
+                        enabled = !realtimeProbe.active && isAccessibilityConnected
+                    ) {
+                        Text(if (realtimeProbe.active) "ĐANG KIỂM THỬ…" else "Bắt đầu kiểm thử 5 giây")
+                    }
+                    TelemetryRow("Probe", if (realtimeProbe.active) "ĐANG CHẠY" else "ĐÃ DỪNG")
+                    TelemetryRow("Sự kiện nhận được", realtimeProbe.eventCount.toString())
+                    TelemetryRow("Sự kiện cuối", realtimeProbe.lastAction)
+                    Text(
+                        text = realtimeProbe.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GamingColors.TextSecondary
+                    )
                 }
             }
         }

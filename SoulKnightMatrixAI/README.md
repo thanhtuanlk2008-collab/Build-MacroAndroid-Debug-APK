@@ -138,3 +138,14 @@ The tracker and joystick gesture APIs are committed as reusable components, but 
 - Unit tests cover nearest-door association, room memory priorities, scan readiness and unreachable-path rejection.
 
 **Important limitation:** these components are now implemented as tested decision/navigation primitives, but this is not yet a complete live gameplay AI. The app still needs a validated visual detector that identifies the player, enemies, special rooms, doors and walkable cells from actual Soul Knight frames. Colour similarity alone is not enough to reliably identify those semantic objects. The current dashboard does not yet connect these room observations to continuous autonomous movement. Do not assume the AI can already play Matrix unattended; first validate detections and paths against real screenshots and then perform supervised device testing.
+
+
+## Automatic room-change dataset collection (2026-11-21)
+
+- The dashboard includes a user-started/stopped dataset collector that listens to the approved MediaProjection frame stream.
+- It samples a compact 24×14 colour signature and looks for a large, persistent visual transition across three frames before saving a JPEG. A 2.5-second cooldown reduces duplicate captures.
+- Images are stored privately in the app's internal `files/matrix-dataset` directory. They are not written to the public photo gallery.
+- The user can provide a fine-grained GitHub personal access token in the dashboard and explicitly start upload. The token is held only in the UI process memory and is not persisted or embedded in the repository. Grant only Contents: Read and write for the selected repository.
+- Upload uses the GitHub Contents API and creates a commit per image under `matrix-dataset/`. A network connection and a token authorized for the selected repository are required.
+
+**Limitations:** this is a visual-change heuristic, not proof of a room transition. Combat effects, animations, camera motion and large UI changes can trigger captures; small or visually similar room transitions can be missed. The first frame establishes the baseline. Upload is manual, not continuous background synchronization. Re-uploading the same already-uploaded filenames may be rejected by GitHub as an existing path. Validate the capture threshold using real gameplay before treating the dataset as labeled room data. The app never uploads anything until the user presses the upload button.

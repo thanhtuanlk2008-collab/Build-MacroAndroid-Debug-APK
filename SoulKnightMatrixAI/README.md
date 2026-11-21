@@ -28,7 +28,7 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`
 - [x] Compose UI for macro settings, profile management, start, stop and emergency stop
 - [x] Main-thread dispatch for Compose state updates from scheduler callbacks
 - [x] Unit tests for MacroConfig and MacroScheduler
-- [ ] Automated tests for Android SharedPreferences profile persistence
+- [x] Robolectric tests for Android SharedPreferences profile persistence
 - [ ] InputController to send game touch gestures
 - [ ] Character and weapon recognition
 - [ ] Device test for joystick plus action-button multitouch

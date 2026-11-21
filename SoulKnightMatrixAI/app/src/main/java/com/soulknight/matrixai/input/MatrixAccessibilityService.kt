@@ -46,10 +46,12 @@ class MatrixAccessibilityService : AccessibilityService() {
         )
     }
 
-    internal fun cancelMatrixGesture(): Boolean = serviceInfo != null && performGlobalAction(GLOBAL_ACTION_BACK).let {
-        // Global navigation is intentionally not used as a cancellation mechanism.
-        false
-    }
+    /**
+     * Android AccessibilityService exposes no dedicated cancel-current-gesture API.
+     * Returning false is intentional; never emulate cancellation with BACK/HOME.
+     * Dispatching a subsequent gesture may cause Android to cancel the prior one.
+     */
+    internal fun cancelMatrixGesture(): Boolean = false
 
     companion object {
         @Volatile

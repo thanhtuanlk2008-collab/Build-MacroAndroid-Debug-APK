@@ -22,7 +22,7 @@ class MovementCalibrationRunner(
     private val screenHeight: Int,
     private val onUpdate: (status: String, profile: MovementProfile?) -> Unit
 ) {
-    private val tracker = PlayerPositionTracker(patchRadius = 5, searchRadius = 48, minimumConfidence = 0.72f)
+    private val tracker = PlayerPositionTracker(patchRadius = 5, searchRadius = 64, minimumConfidence = 0.72f)
     private val calibrator = MovementCalibrator(smoothing = 1f)
     private val joystick = JoystickController(inputController)
     private val trials = listOf(
@@ -162,8 +162,8 @@ class MovementCalibrationRunner(
     private data class Trial(val dx: Float, val dy: Float, val direction: MovementDirection, val label: String)
 
     companion object {
-        const val TRIAL_DURATION_MS = 280L
-        const val FRAME_SETTLE_DELAY_MS = 240L
+        const val TRIAL_DURATION_MS = 450L
+        const val FRAME_SETTLE_DELAY_MS = 160L
         const val DEFAULT_JOYSTICK_RADIUS = 42f
         const val MIN_MEASURED_DISPLACEMENT_PX = 2.0f
     }

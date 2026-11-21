@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.soulknight.matrixai.capture.ScreenCaptureService
+import com.soulknight.matrixai.capture.FrameSnapshotStore
 import com.soulknight.matrixai.macro.MacroConfig
 import com.soulknight.matrixai.macro.MacroProfileStore
 import com.soulknight.matrixai.macro.MacroScheduler
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             var config by remember { mutableStateOf(store.load()) }
             var captureStatus by remember { mutableStateOf("Chưa cấp quyền chụp màn hình") }
+            var frameStatus by remember { mutableStateOf("Chưa nhận được khung hình") }
             var macroStatus by remember { mutableStateOf("Macro đang dừng") }
             var lastEvent by remember { mutableStateOf("Chưa có sự kiện") }
             var profileName by remember { mutableStateOf("Cấu hình mới") }
@@ -86,6 +88,15 @@ class MainActivity : ComponentActivity() {
             }
             DisposableEffect(Unit) {
                 onDispose { scheduler.stop(); inputQueue.stop() }
+            }
+            DisposableEffect(Unit) {
+                val frameListener: (com.soulknight.matrixai.vision.FrameSnapshot) -> Unit = { frame ->
+                    mainHandler.post {
+                        frameStatus = "Đang nhận khung hình: ${frame.width} × ${frame.height} (xấp xỉ 5 FPS)"
+                    }
+                }
+                FrameSnapshotStore.addListener(frameListener)
+                onDispose { FrameSnapshotStore.removeListener(frameListener) }
             }
 
             MaterialTheme {
@@ -282,6 +293,7 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 Text("4. Chụp màn hình", style = MaterialTheme.typography.titleLarge)
                                 Text(captureStatus)
+                                Text(frameStatus, style = MaterialTheme.typography.bodySmall)
                                 Button(
                                     onClick = {
                                         val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager

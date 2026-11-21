@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.soulknight.matrixai.capture.ScreenCaptureService
-import com.soulknight.matrixai.macro.MacroAction
 import com.soulknight.matrixai.macro.MacroConfig
 import com.soulknight.matrixai.macro.MacroConfigStore
 import com.soulknight.matrixai.macro.MacroScheduler
@@ -44,8 +45,21 @@ class MainActivity : ComponentActivity() {
             var captureStatus by remember { mutableStateOf("Chưa cấp quyền chụp màn hình") }
             var macroStatus by remember { mutableStateOf("Macro đang dừng") }
             var lastEvent by remember { mutableStateOf("Chưa có sự kiện") }
+            var profileName by remember { mutableStateOf("Cấu hình mới") }
+            var profiles by remember { mutableStateOf(store.profileNames()) }
+            val mainHandler = remember { Handler(Looper.getMainLooper()) }
             val scheduler = remember {
-                MacroScheduler { action -> lastEvent = "Đến lịch: ${action.displayName}" }
+                MacroScheduler(
+                    onAction = { action ->
+                        // Compose state must only be changed on the main thread.
+                        mainHandler.post { lastEvent = "Đến lịch: ${action.displayName}" }
+                    },
+                    onError = { action, error ->
+                        mainHandler.post {
+                            lastEvent = "Lỗi callback ${action.displayName}: ${error.message ?: "không rõ"}"
+                        }
+                    }
+                )
             }
             DisposableEffect(Unit) {
                 onDispose { scheduler.stop() }
@@ -61,7 +75,10 @@ class MainActivity : ComponentActivity() {
                         Text("Macro Engine · Bản thử nghiệm cấu hình", style = MaterialTheme.typography.titleMedium)
 
                         Card {
-                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(
+                                Modifier.fillMaxWidth().padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 Text("1. Cấu hình Macro", style = MaterialTheme.typography.titleLarge)
                                 MacroSetting(
                                     title = "Tấn công",
@@ -93,14 +110,63 @@ class MainActivity : ComponentActivity() {
                                     onInterval = { config = config.copy(switchWeaponIntervalMs = it.toLong()) }
                                 )
                                 Button(
-                                    onClick = { store.save(config); macroStatus = "Đã lưu cấu hình Macro" },
+                                    onClick = {
+                                        store.save(config)
+                                        macroStatus = "Đã lưu cấu hình mặc định"
+                                    },
                                     modifier = Modifier.fillMaxWidth()
-                                ) { Text("Lưu cấu hình") }
+                                ) { Text("Lưu cấu hình mặc định") }
+
+                                HorizontalDivider()
+                                Text("Cấu hình đã lưu", style = MaterialTheme.typography.titleMedium)
+                                OutlinedTextField(
+                                    value = profileName,
+                                    onValueChange = { profileName = it },
+                                    label = { Text("Tên cấu hình mới") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Button(
+                                    onClick = {
+                                        try {
+                                            store.saveProfile(profileName, config)
+                                            profiles = store.profileNames()
+                                            macroStatus = "Đã lưu hồ sơ: ${profileName.trim()}"
+                                        } catch (error: IllegalArgumentException) {
+                                            macroStatus = error.message ?: "Tên cấu hình không hợp lệ"
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Lưu thành cấu hình riêng") }
+                                profiles.forEach { name ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(name, modifier = Modifier.weight(1f))
+                                        TextButton(onClick = {
+                                            config = store.loadProfile(name)
+                                            profileName = name
+                                            macroStatus = "Đã tải cấu hình: $name"
+                                        }) { Text("Tải") }
+                                        if (name != MacroConfigStore.DEFAULT_PROFILE) {
+                                            TextButton(onClick = {
+                                                store.deleteProfile(name)
+                                                profiles = store.profileNames()
+                                                macroStatus = "Đã xóa cấu hình: $name"
+                                            }) { Text("Xóa") }
+                                        }
+                                    }
+                                }
                             }
                         }
 
                         Card {
-                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(
+                                Modifier.fillMaxWidth().padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 Text("2. Bộ lập lịch Macro", style = MaterialTheme.typography.titleLarge)
                                 Text(macroStatus)
                                 Text("Sự kiện gần nhất: $lastEvent", style = MaterialTheme.typography.bodySmall)
@@ -108,8 +174,12 @@ class MainActivity : ComponentActivity() {
                                     Button(
                                         onClick = {
                                             store.save(config)
-                                            scheduler.start(config)
-                                            macroStatus = "Đang chạy bộ lập lịch (chế độ kiểm thử)"
+                                            val started = scheduler.start(config)
+                                            macroStatus = if (started) {
+                                                "Đang chạy bộ lập lịch (chế độ kiểm thử)"
+                                            } else {
+                                                "Không thể chạy: hãy bật ít nhất một chức năng"
+                                            }
                                         },
                                         modifier = Modifier.weight(1f)
                                     ) { Text("Chạy") }
@@ -121,6 +191,17 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier.weight(1f)
                                     ) { Text("Dừng") }
                                 }
+                                Button(
+                                    onClick = {
+                                        scheduler.stop()
+                                        macroStatus = "ĐÃ DỪNG KHẨN CẤP"
+                                        lastEvent = "Đã yêu cầu dừng toàn bộ tác vụ Macro"
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) { Text("Emergency Stop") }
                                 Text(
                                     "Lưu ý: hiện tại ứng dụng chỉ phát sự kiện theo lịch để kiểm thử. " +
                                         "Chưa gửi thao tác chạm vào game.",
@@ -131,27 +212,32 @@ class MainActivity : ComponentActivity() {
                         }
 
                         Card {
-                            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(
+                                Modifier.fillMaxWidth().padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 Text("3. Chụp màn hình", style = MaterialTheme.typography.titleLarge)
                                 Text(captureStatus)
-                                Button(onClick = {
-                                    val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                                    captureLauncher.launch(manager.createScreenCaptureIntent())
-                                    captureStatus = "Đang chờ bạn cấp quyền..."
-                                }, modifier = Modifier.fillMaxWidth()) {
-                                    Text("Cấp quyền chụp màn hình")
-                                }
-                                OutlinedButton(onClick = {
-                                    stopService(Intent(this@MainActivity, ScreenCaptureService::class.java))
-                                    captureStatus = "Đã yêu cầu dừng dịch vụ"
-                                }, modifier = Modifier.fillMaxWidth()) {
-                                    Text("Dừng chụp màn hình")
-                                }
+                                Button(
+                                    onClick = {
+                                        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                                        captureLauncher.launch(manager.createScreenCaptureIntent())
+                                        captureStatus = "Đang chờ bạn cấp quyền..."
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Cấp quyền chụp màn hình") }
+                                OutlinedButton(
+                                    onClick = {
+                                        stopService(Intent(this@MainActivity, ScreenCaptureService::class.java))
+                                        captureStatus = "Đã yêu cầu dừng dịch vụ"
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) { Text("Dừng chụp màn hình") }
                             }
                         }
                         Text(
                             "Macro Engine và AI Engine được tách riêng. Điều khiển cảm ứng thực tế " +
-                                "sẽ cần InputController có quyền phù hợp và kiểm thử trên thiết bị.",
+                                "cần InputController có quyền phù hợp và kiểm thử trên thiết bị.",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

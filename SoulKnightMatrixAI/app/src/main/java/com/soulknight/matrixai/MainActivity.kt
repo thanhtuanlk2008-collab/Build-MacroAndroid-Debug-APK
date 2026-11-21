@@ -370,6 +370,8 @@ class MainActivity : ComponentActivity() {
 
                         com.soulknight.matrixai.capture.MatrixDatasetPanel()
 
+                        com.soulknight.matrixai.vision.PlayerAutoDetectionPanel()
+
                         Card {
                             Column(
                                 Modifier.fillMaxWidth().padding(16.dp),

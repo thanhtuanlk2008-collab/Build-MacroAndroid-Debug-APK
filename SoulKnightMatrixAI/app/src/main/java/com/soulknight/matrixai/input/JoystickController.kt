@@ -36,7 +36,8 @@ class JoystickController(private val input: InputController) {
         val endX = center.x + dx
         val endY = center.y + dy
         if (center.x >= screenWidth || center.y >= screenHeight ||
-            endX !in 0f until screenWidth.toFloat() || endY !in 0f until screenHeight.toFloat()
+            endX < 0f || endX >= screenWidth.toFloat() ||
+            endY < 0f || endY >= screenHeight.toFloat()
         ) {
             callback(InputResult.InvalidCoordinates)
             return -1L

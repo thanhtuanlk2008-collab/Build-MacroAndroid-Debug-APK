@@ -25,6 +25,11 @@ import com.soulknight.matrixai.macro.MacroConfig
 import com.soulknight.matrixai.macro.MacroProfileStore
 import com.soulknight.matrixai.macro.MacroScheduler
 import com.soulknight.matrixai.input.MatrixAccessibilityService
+import com.soulknight.matrixai.input.InputActionQueue
+import com.soulknight.matrixai.input.InputTarget
+import com.soulknight.matrixai.input.InputTargetConfig
+import com.soulknight.matrixai.input.InputTargetStore
+import java.util.concurrent.atomic.AtomicReference
 
 class MainActivity : ComponentActivity() {
     private var accessibilityConnected by mutableStateOf(false)
@@ -51,6 +56,14 @@ class MainActivity : ComponentActivity() {
         val store = MacroProfileStore(this)
         val targetStore = InputTargetStore(this)
         setContent {
+            var targets by remember { mutableStateOf(targetStore.load()) }
+            val targetRef = remember { AtomicReference(targets) }
+            var attackX by remember { mutableStateOf(targets.attack?.x?.toString() ?: "") }
+            var attackY by remember { mutableStateOf(targets.attack?.y?.toString() ?: "") }
+            var skillX by remember { mutableStateOf(targets.skill?.x?.toString() ?: "") }
+            var skillY by remember { mutableStateOf(targets.skill?.y?.toString() ?: "") }
+            var weaponX by remember { mutableStateOf(targets.switchWeapon?.x?.toString() ?: "") }
+            var weaponY by remember { mutableStateOf(targets.switchWeapon?.y?.toString() ?: "") }
             var config by remember { mutableStateOf(store.load()) }
             var captureStatus by remember { mutableStateOf("Chưa cấp quyền chụp màn hình") }
             var frameStatus by remember { mutableStateOf("Chưa nhận được khung hình") }

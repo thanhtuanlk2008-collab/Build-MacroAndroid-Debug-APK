@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
                 val frameListener: (com.soulknight.matrixai.vision.FrameSnapshot) -> Unit = { frame ->
                     mainHandler.post {
                         previewFrame = frame
-                        frameStatus = "Đang nhận khung hình: ${frame.width} × ${frame.height} (xấp xỉ 5 FPS)"
+                        frameStatus = "Đang nhận khung hình: ${frame.width} × ${frame.height} (xấp xỉ 10 FPS)"
                     }
                 }
                 FrameSnapshotStore.addListener(frameListener)
@@ -424,7 +424,7 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier.fillMaxWidth()
                                 ) { Text("Dừng hiệu chỉnh") }
                                 Text(
-                                    "AI thực hiện 3 lượt joystick ngắn, lần lượt ngang, dọc và chéo. Tốc độ được đo trên ảnh chụp 5 FPS; nếu nhân vật không di chuyển rõ, phép đo sẽ bị từ chối.",
+                                    "AI thực hiện 3 lượt joystick ngắn, lần lượt ngang, dọc và chéo. Tốc độ được đo trên ảnh chụp khoảng 10 FPS; nếu nhân vật không di chuyển rõ, phép đo sẽ bị từ chối.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error
                                 )

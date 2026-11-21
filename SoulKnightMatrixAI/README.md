@@ -72,3 +72,20 @@ Tọa độ là pixel màn hình hiện tại, phụ thuộc độ phân giải,
 Queue chỉ gửi tuần tự, không có multitouch độc lập. Stop ngăn các mục đang chờ được gửi tiếp; Android không cung cấp API Accessibility công khai để hủy chắc chắn gesture đã được gửi và đang chạy. Vì vậy Emergency Stop không thể bảo đảm thu hồi một gesture đang thực thi.
 
 Chưa đánh dấu InputController hoàn tất cho tới khi workflow build/test thành công và thao tác được kiểm thử trên thiết bị Android thật.
+
+
+## Visual Sir Verdant route analysis
+
+The visual baseline now includes:
+- `vision/TemplateMatcher.kt`: deterministic normalized RGB reference-template matching.
+- `vision/MatrixRouteVisionAnalyzer.kt`: compares reference crops for biome and the Sir Verdant entrance.
+- `matrix/MatrixRouteCoordinator.kt`: passes visual results into the post-boss route policy.
+- Unit tests cover exact template matching, Sir Verdant priority and Glacier exclusion.
+
+This is **not a trained AI model**. It requires reference crops taken from actual Soul Knight screenshots at matching scale and orientation. No game-specific templates are bundled. The screen-capture service still closes incoming frames instead of forwarding them to this analyzer, so this code is currently a tested analysis component, not live in-game recognition. It also does not move the character.
+
+Remaining work:
+- Forward approved MediaProjection frames into the vision pipeline.
+- Add/collect reference crops for Glacier, Relics, other biomes and the Sir Verdant entrance.
+- Validate matching against animation, scaling and visual effects.
+- Connect the detected entrance to GridMap/A* and a separately verified navigation/input controller.

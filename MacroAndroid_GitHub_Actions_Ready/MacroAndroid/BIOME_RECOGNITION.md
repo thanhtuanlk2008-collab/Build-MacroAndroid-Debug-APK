@@ -19,7 +19,7 @@ The 11 normal Matrix biome labels are supported. Cave, Grave and Swamp are inclu
 
 The RGB histogram is a lightweight baseline, not a trained visual model. It ignores geometry and spatial layout, so different biomes can have similar scores. The similarity score is not a calibrated probability. Predictions always require player review; low scores return null rather than forcing a label.
 
-No automatic online training, cloud upload, screen capture, or touch automation is performed by this component. Screen capture integration must use Android's explicit MediaProjection consent flow in a separate step.
+Screen capture is now provided by BiomeCaptureService through Android's explicit MediaProjection consent dialog. Capture runs as a visible mediaProjection foreground service with a persistent notification and a Stop action. Frames are converted to Bitmaps in memory, analyzed locally, and recycled; raw screenshots are not persisted or uploaded. The service samples at a limited interval and writes only feature vectors and pending predictions to Room. It does not perform touch automation.
 
 ## Database migration
 
@@ -30,4 +30,4 @@ Room schema version 2 adds biome_feedback and migrates existing version-1 databa
 
 The app now has a dedicated Biome tab. It lists pending predictions, shows the predicted label and similarity score, and lets the player select one of the Matrix biome labels before confirming. A pending item can also be discarded.
 
-The UI explicitly labels the score as similarity rather than probability. It also states that current pending rows contain a feature vector rather than a stored screenshot. The screen is a review interface only: the gameplay frame source is not yet connected, so the list remains empty until a future capture adapter or another trusted caller records a prediction.
+The UI explicitly labels the score as similarity rather than probability. It also states that current pending rows contain a feature vector rather than a stored screenshot. The screen also starts/stops the user-approved capture session. The user must approve Android's system screen-sharing prompt each time a session is started. Predictions remain PENDING until the player explicitly confirms a biome; only CONFIRMED rows can influence later classification.

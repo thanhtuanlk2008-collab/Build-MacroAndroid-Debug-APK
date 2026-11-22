@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macro.app.MacroApplication
+import com.macro.app.biome.BiomeId
+import com.macro.app.data.BiomeFeedbackEntity
 import com.macro.app.engine.MacroEngine
 import com.macro.app.engine.PlaybackTelemetry
 import com.macro.app.engine.SpeedEngine

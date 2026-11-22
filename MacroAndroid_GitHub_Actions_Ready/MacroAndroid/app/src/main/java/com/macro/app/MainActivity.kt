@@ -3,6 +3,10 @@ package com.macro.app
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.content.Intent
+import android.media.projection.MediaProjectionManager
+import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
+import com.macro.app.service.BiomeCaptureService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -56,6 +60,19 @@ enum class NavTab(val label: String) {
 
 class MainActivity : ComponentActivity() {
 
+    private val projectionManager by lazy { getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager }
+
+    private val biomeCaptureLauncher = registerForActivityResult(StartActivityForResult()) { result ->
+        val data = result.data
+        if (result.resultCode == RESULT_OK && data != null) {
+            val serviceIntent = Intent(this, BiomeCaptureService::class.java)
+                .putExtra(BiomeCaptureService.EXTRA_RESULT_CODE, result.resultCode)
+                .putExtra(BiomeCaptureService.EXTRA_RESULT_DATA, data)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent)
+            else startService(serviceIntent)
+        }
+    }
+
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { /* handled via resume refresh */ }
@@ -71,13 +88,20 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MacroAppRoot()
+            MacroAppRoot(
+                onStartBiomeCapture = { biomeCaptureLauncher.launch(projectionManager.createScreenCaptureIntent()) },
+                onStopBiomeCapture = { BiomeCaptureService.stop(this) }
+            )
         }
     }
 }
 
 @Composable
-fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
+fun MacroAppRoot(
+    viewModel: MacroViewModel = viewModel(),
+    onStartBiomeCapture: () -> Unit = {},
+    onStopBiomeCapture: () -> Unit = {}
+) {
     val settings by viewModel.settings.collectAsState()
     val macros by viewModel.macros.collectAsState()
     val permissionStatus by viewModel.permissionStatus.collectAsState()
@@ -90,6 +114,7 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
     val pendingBiomeFeedback by viewModel.pendingBiomeFeedback.collectAsState()
 
     var currentTab by remember { mutableStateOf(NavTab.HOME) }
+    var biomeCaptureActive by remember { mutableStateOf(BiomeCaptureService.isRunning) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -192,6 +217,15 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
                     )
 
                     NavTab.BIOME -> BiomeReviewScreen(
+                        captureActive = biomeCaptureActive,
+                        onStartCapture = {
+                            onStartBiomeCapture()
+                            biomeCaptureActive = true
+                        },
+                        onStopCapture = {
+                            onStopBiomeCapture()
+                            biomeCaptureActive = false
+                        },
                         pending = pendingBiomeFeedback,
                         onConfirm = { id, biome -> viewModel.confirmBiomeFeedback(id, biome) },
                         onDiscard = { viewModel.discardBiomeFeedback(it) },

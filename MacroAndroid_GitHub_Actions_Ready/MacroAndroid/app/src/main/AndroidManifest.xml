@@ -8,6 +8,7 @@
     <!-- Required for keeping Floating Control & Macro Engine alive reliably on Android 10-16 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Optional: Prevent CPU sleep during active macro playback if needed -->
@@ -46,6 +47,12 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- User-approved screen capture for local biome recognition -->
+        <service
+            android:name=".service.BiomeCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
 
         <!-- Floating Control Window Foreground Service -->
         <service

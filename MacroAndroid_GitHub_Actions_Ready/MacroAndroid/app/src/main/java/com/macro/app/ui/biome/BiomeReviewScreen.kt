@@ -104,7 +104,7 @@ fun BiomeReviewScreen(
                     border = BorderStroke(1.dp, GamingColors.BorderSubtle)) {
                     Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Chưa có dự đoán cần xác nhận", fontWeight = FontWeight.Bold, color = GamingColors.TextPrimary)
-                        Text("Dự đoán sẽ xuất hiện khi engine nhận được khung hình gameplay. Tính năng thu khung hình chưa được kết nối.",
+                        Text("Dự đoán sẽ xuất hiện sau khi engine phân tích được khung hình gameplay và có dữ liệu mẫu phù hợp.",
                             style = MaterialTheme.typography.bodySmall, color = GamingColors.TextSecondary)
                     }
                 }

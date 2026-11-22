@@ -1,9 +1,13 @@
 package com.macro.app.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "biome_feedback")
+@Entity(
+    tableName = "biome_feedback",
+    indices = [Index(value = ["status", "createdAt"])]
+)
 data class BiomeFeedbackEntity(
     @PrimaryKey val id: String,
     val predictedBiome: String?,

@@ -60,6 +60,8 @@ enum class NavTab(val label: String) {
 
 class MainActivity : ComponentActivity() {
 
+    private val biomeCaptureActiveState = mutableStateOf(false)
+
     private val projectionManager by lazy { getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager }
 
     private val biomeCaptureLauncher = registerForActivityResult(StartActivityForResult()) { result ->
@@ -70,6 +72,7 @@ class MainActivity : ComponentActivity() {
                 .putExtra(BiomeCaptureService.EXTRA_RESULT_DATA, data)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent)
             else startService(serviceIntent)
+            biomeCaptureActiveState.value = true
         }
     }
 
@@ -89,8 +92,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MacroAppRoot(
+                captureActive = biomeCaptureActiveState.value,
                 onStartBiomeCapture = { biomeCaptureLauncher.launch(projectionManager.createScreenCaptureIntent()) },
-                onStopBiomeCapture = { BiomeCaptureService.stop(this) }
+                onStopBiomeCapture = {
+                    BiomeCaptureService.stop(this)
+                    biomeCaptureActiveState.value = false
+                }
             )
         }
     }
@@ -98,6 +105,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MacroAppRoot(
+    captureActive: Boolean,
     viewModel: MacroViewModel = viewModel(),
     onStartBiomeCapture: () -> Unit = {},
     onStopBiomeCapture: () -> Unit = {}
@@ -114,7 +122,6 @@ fun MacroAppRoot(
     val pendingBiomeFeedback by viewModel.pendingBiomeFeedback.collectAsState()
 
     var currentTab by remember { mutableStateOf(NavTab.HOME) }
-    var biomeCaptureActive by remember { mutableStateOf(BiomeCaptureService.isRunning) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -217,14 +224,12 @@ fun MacroAppRoot(
                     )
 
                     NavTab.BIOME -> BiomeReviewScreen(
-                        captureActive = biomeCaptureActive,
+                        captureActive = captureActive,
                         onStartCapture = {
                             onStartBiomeCapture()
-                            biomeCaptureActive = true
                         },
                         onStopCapture = {
                             onStopBiomeCapture()
-                            biomeCaptureActive = false
                         },
                         pending = pendingBiomeFeedback,
                         onConfirm = { id, biome -> viewModel.confirmBiomeFeedback(id, biome) },

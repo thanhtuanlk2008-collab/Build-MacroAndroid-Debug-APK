@@ -24,3 +24,10 @@ No automatic online training, cloud upload, screen capture, or touch automation 
 ## Database migration
 
 Room schema version 2 adds biome_feedback and migrates existing version-1 databases without deleting macro records.
+
+
+## Biome Review UI
+
+The app now has a dedicated Biome tab. It lists pending predictions, shows the predicted label and similarity score, and lets the player select one of the Matrix biome labels before confirming. A pending item can also be discarded.
+
+The UI explicitly labels the score as similarity rather than probability. It also states that current pending rows contain a feature vector rather than a stored screenshot. The screen is a review interface only: the gameplay frame source is not yet connected, so the list remains empty until a future capture adapter or another trusted caller records a prediction.

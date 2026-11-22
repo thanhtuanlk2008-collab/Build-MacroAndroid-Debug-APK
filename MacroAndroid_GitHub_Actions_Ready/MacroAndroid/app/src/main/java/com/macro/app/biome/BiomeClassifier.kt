@@ -1,14 +1,20 @@
 package com.macro.app.biome
 
 /**
- * Nearest-histogram baseline. Only player-confirmed gameplay samples are accepted.
- * Wiki artwork is deliberately excluded: it is reference material, not gameplay ground truth.
+ * Conservative nearest-histogram baseline.
+ *
+ * A single known biome is not enough to classify a new frame: otherwise every
+ * sufficiently similar room can be forced into that one label. A prediction is
+ * emitted only when at least two biome classes are represented and the best
+ * class wins by a clear margin. All predictions still require player review.
  */
 class BiomeClassifier(
-    private val minimumSimilarity: Float = 0.82f
+    private val minimumSimilarity: Float = 0.82f,
+    private val minimumClassMargin: Float = 0.05f
 ) {
     init {
         require(minimumSimilarity.isFinite() && minimumSimilarity in 0f..1f)
+        require(minimumClassMargin.isFinite() && minimumClassMargin in 0f..1f)
     }
 
     fun predict(
@@ -24,10 +30,19 @@ class BiomeClassifier(
             .mapValues { (_, samples) ->
                 samples.maxOf { similarity(query, it.feature) }
             }
-        val best = bestByBiome.maxByOrNull { it.value }
-            ?: return BiomePrediction(null, 0f, true, 0)
 
-        val accepted = best.value >= minimumSimilarity
+        // Do not let a one-class training set label every vaguely similar room.
+        if (bestByBiome.size < MINIMUM_BIOME_CLASSES) {
+            val bestSimilarity = bestByBiome.values.maxOrNull() ?: 0f
+            return BiomePrediction(null, bestSimilarity, true, confirmedSamples.size)
+        }
+
+        val ranked = bestByBiome.entries.sortedByDescending { it.value }
+        val best = ranked.first()
+        val runnerUp = ranked[1]
+        val margin = best.value - runnerUp.value
+        val accepted = best.value >= minimumSimilarity && margin >= minimumClassMargin
+
         return BiomePrediction(
             biome = if (accepted) best.key else null,
             similarity = best.value,
@@ -42,5 +57,9 @@ class BiomeClassifier(
             .average()
             .toFloat()
         return (1f - meanAbsoluteDifference).coerceIn(0f, 1f)
+    }
+
+    companion object {
+        private const val MINIMUM_BIOME_CLASSES = 2
     }
 }

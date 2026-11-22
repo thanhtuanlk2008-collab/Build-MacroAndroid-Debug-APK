@@ -28,6 +28,9 @@ jobs:
           curl -L https://services.gradle.org/distributions/gradle-8.10.2-bin.zip -o gradle.zip
           unzip -q gradle.zip -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/gradle-8.10.2/bin" >> "$GITHUB_PATH"
+      - name: Run unit tests
+        working-directory: MacroAndroid_GitHub_Actions_Ready/MacroAndroid
+        run: gradle testDebugUnitTest --stacktrace
       - name: Compile debug APK
         working-directory: MacroAndroid_GitHub_Actions_Ready/MacroAndroid
         run: gradle assembleDebug --stacktrace

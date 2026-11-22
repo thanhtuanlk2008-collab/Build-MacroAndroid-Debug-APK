@@ -13,11 +13,15 @@ class BiomeClassifierTest {
     }
 
     @Test
-    fun exactConfirmedSampleIsRecognizedButStillRequiresReview() {
+    fun exactConfirmedSampleIsRecognizedWhenCompetingBiomeExists() {
         val forest = feature(0, 8, 16)
+        val glacier = feature(1, 9, 17)
         val prediction = BiomeClassifier(0.8f).predict(
             forest,
-            listOf(ConfirmedBiomeSample(BiomeId.FOREST, forest))
+            listOf(
+                ConfirmedBiomeSample(BiomeId.FOREST, forest),
+                ConfirmedBiomeSample(BiomeId.GLACIER, glacier)
+            )
         )
 
         assertEquals(BiomeId.FOREST, prediction.biome)
@@ -34,10 +38,41 @@ class BiomeClassifierTest {
     }
 
     @Test
+    fun oneKnownBiomeIsNotUsedToForceClassification() {
+        val forest = feature(0, 8, 16)
+        val prediction = BiomeClassifier().predict(
+            forest,
+            listOf(ConfirmedBiomeSample(BiomeId.FOREST, forest))
+        )
+
+        assertNull(prediction.biome)
+        assertEquals(1, prediction.samplesCompared)
+        assertTrue(prediction.requiresPlayerReview)
+    }
+
+    @Test
+    fun ambiguousMatchBetweenBiomeClassesReturnsUnknown() {
+        val sharedAppearance = feature(0, 8, 16)
+        val prediction = BiomeClassifier(minimumClassMargin = 0.05f).predict(
+            sharedAppearance,
+            listOf(
+                ConfirmedBiomeSample(BiomeId.FOREST, sharedAppearance),
+                ConfirmedBiomeSample(BiomeId.RELICS, sharedAppearance)
+            )
+        )
+
+        assertNull(prediction.biome)
+        assertTrue(prediction.requiresPlayerReview)
+    }
+
+    @Test
     fun dissimilarSampleIsNotForcedIntoBiomeLabel() {
         val prediction = BiomeClassifier(0.95f).predict(
             feature(0),
-            listOf(ConfirmedBiomeSample(BiomeId.VOLCANO, feature(23)))
+            listOf(
+                ConfirmedBiomeSample(BiomeId.VOLCANO, feature(23)),
+                ConfirmedBiomeSample(BiomeId.FOREST, feature(22))
+            )
         )
         assertNull(prediction.biome)
         assertTrue(prediction.requiresPlayerReview)

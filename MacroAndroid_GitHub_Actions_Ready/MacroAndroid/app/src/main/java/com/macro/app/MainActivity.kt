@@ -80,6 +80,11 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { /* handled via resume refresh */ }
 
+    override fun onResume() {
+        super.onResume()
+        biomeCaptureActiveState.value = BiomeCaptureService.isRunning
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -93,7 +98,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             MacroAppRoot(
                 captureActive = biomeCaptureActiveState.value,
-                onStartBiomeCapture = { biomeCaptureLauncher.launch(projectionManager.createScreenCaptureIntent()) },
+                onStartBiomeCapture = {
+                    if (BiomeCaptureService.isRunning) {
+                        biomeCaptureActiveState.value = true
+                    } else {
+                        biomeCaptureLauncher.launch(projectionManager.createScreenCaptureIntent())
+                    }
+                },
                 onStopBiomeCapture = {
                     BiomeCaptureService.stop(this)
                     biomeCaptureActiveState.value = false

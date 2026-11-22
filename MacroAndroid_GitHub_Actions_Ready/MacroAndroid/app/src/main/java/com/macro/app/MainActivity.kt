@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ import com.macro.app.ui.home.HomeScreen
 import com.macro.app.ui.library.MacroLibraryScreen
 import com.macro.app.ui.settings.SettingsScreen
 import com.macro.app.ui.testing.TestingDashboardScreen
+import com.macro.app.ui.biome.BiomeReviewScreen
 import com.macro.app.ui.theme.GamingColors
 import com.macro.app.ui.theme.MacroTheme
 import com.macro.app.utils.PermissionManager
@@ -48,6 +50,7 @@ enum class NavTab(val label: String) {
     EDITOR("Trình sửa"),
     LIBRARY("Thư viện"),
     TESTING("Kiểm thử"),
+    BIOME("Biome"),
     SETTINGS("Cài đặt")
 }
 
@@ -84,6 +87,7 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
     val floatingActive by viewModel.floatingActive.collectAsState()
     val editingMacro by viewModel.editingMacro.collectAsState()
     val isAccessibilityConnected by viewModel.isAccessibilityConnected.collectAsState()
+    val pendingBiomeFeedback by viewModel.pendingBiomeFeedback.collectAsState()
 
     var currentTab by remember { mutableStateOf(NavTab.HOME) }
 
@@ -111,6 +115,7 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
                             NavTab.EDITOR -> Icons.Default.Edit
                             NavTab.LIBRARY -> Icons.Default.FolderOpen
                             NavTab.TESTING -> Icons.Default.Science
+                            NavTab.BIOME -> Icons.Default.Palette
                             NavTab.SETTINGS -> Icons.Default.Settings
                         }
                         NavigationBarItem(
@@ -184,6 +189,13 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
                         onExportMacroJson = { viewModel.exportMacroJson(it) },
                         onExportAllJson = { viewModel.exportAllJson() },
                         onImportJson = { raw, cb -> viewModel.importJson(raw, cb) }
+                    )
+
+                    NavTab.BIOME -> BiomeReviewScreen(
+                        pending = pendingBiomeFeedback,
+                        onConfirm = { id, biome -> viewModel.confirmBiomeFeedback(id, biome) },
+                        onDiscard = { viewModel.discardBiomeFeedback(it) },
+                        onRefresh = { viewModel.refreshBiomeFeedback() }
                     )
 
                     NavTab.TESTING -> TestingDashboardScreen(

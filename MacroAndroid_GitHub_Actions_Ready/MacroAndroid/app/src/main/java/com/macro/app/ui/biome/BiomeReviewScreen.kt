@@ -61,6 +61,9 @@ private fun BiomeId.vietnameseName(): String = when (this) {
 @Composable
 fun BiomeReviewScreen(
     pending: List<BiomeFeedbackEntity>,
+    captureActive: Boolean,
+    onStartCapture: () -> Unit,
+    onStopCapture: () -> Unit,
     onConfirm: (String, BiomeId) -> Unit,
     onDiscard: (String) -> Unit,
     onRefresh: () -> Unit
@@ -79,6 +82,17 @@ fun BiomeReviewScreen(
                 style = MaterialTheme.typography.bodySmall, color = GamingColors.TextSecondary)
             Text("Điểm tương đồng chỉ là điểm so khớp, không phải xác suất. Mỗi mục hiện chỉ lưu vector màu, chưa lưu ảnh màn hình.",
                 style = MaterialTheme.typography.bodySmall, color = GamingColors.AmberWarn)
+            if (captureActive) {
+                Button(onClick = onStopCapture, modifier = Modifier.fillMaxWidth()) {
+                    Text("Dừng phân tích màn hình")
+                }
+            } else {
+                Button(onClick = onStartCapture, modifier = Modifier.fillMaxWidth()) {
+                    Text("Bắt đầu phân tích màn hình")
+                }
+            }
+            Text("Khi bắt đầu, Android sẽ hiển thị hộp thoại cấp quyền chia sẻ màn hình. Ảnh chỉ xử lý trong bộ nhớ; ứng dụng chỉ lưu vector đặc trưng và dự đoán.",
+                style = MaterialTheme.typography.bodySmall, color = GamingColors.TextSecondary)
             OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
                 Text("Làm mới danh sách")
             }

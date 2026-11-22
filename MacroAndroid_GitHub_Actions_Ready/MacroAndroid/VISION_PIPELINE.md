@@ -4,9 +4,9 @@
 
 Bitmap frame -> preprocessing -> entity detector -> game-state estimator -> VisionResult.
 
-- FramePreprocessor validates frames and scales large images down to a bounded size.
+- FramePreprocessor validates frame dimensions/timestamps and scales large images down to a bounded size. The pipeline releases only its own temporary downscaled bitmap; the caller retains ownership of the input bitmap.
 - EntityDetector is the replaceable detector interface.
-- TemplateMatchingDetector is a lightweight grayscale template-matching baseline.
+- TemplateMatchingDetector is a lightweight grayscale template-matching baseline. Constructor parameters and template thresholds are validated; candidate storage is bounded to avoid unbounded memory growth on noisy frames.
 - GameStateEstimator maps detections to a coarse phase (combat, boss fight, reward, exploration, unknown).
 - MatrixVisionPipeline orchestrates the stages and measures processing time.
 

@@ -3,6 +3,10 @@ package com.macro.app
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.content.Intent
+import android.media.projection.MediaProjectionManager
+import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
+import com.macro.app.service.BiomeCaptureService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -39,6 +44,7 @@ import com.macro.app.ui.home.HomeScreen
 import com.macro.app.ui.library.MacroLibraryScreen
 import com.macro.app.ui.settings.SettingsScreen
 import com.macro.app.ui.testing.TestingDashboardScreen
+import com.macro.app.ui.biome.BiomeReviewScreen
 import com.macro.app.ui.theme.GamingColors
 import com.macro.app.ui.theme.MacroTheme
 import com.macro.app.utils.PermissionManager
@@ -48,14 +54,36 @@ enum class NavTab(val label: String) {
     EDITOR("Trình sửa"),
     LIBRARY("Thư viện"),
     TESTING("Kiểm thử"),
+    BIOME("Biome"),
     SETTINGS("Cài đặt")
 }
 
 class MainActivity : ComponentActivity() {
 
+    private val biomeCaptureActiveState = mutableStateOf(false)
+
+    private val projectionManager by lazy { getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager }
+
+    private val biomeCaptureLauncher = registerForActivityResult(StartActivityForResult()) { result ->
+        val data = result.data
+        if (result.resultCode == RESULT_OK && data != null) {
+            val serviceIntent = Intent(this, BiomeCaptureService::class.java)
+                .putExtra(BiomeCaptureService.EXTRA_RESULT_CODE, result.resultCode)
+                .putExtra(BiomeCaptureService.EXTRA_RESULT_DATA, data)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent)
+            else startService(serviceIntent)
+            biomeCaptureActiveState.value = true
+        }
+    }
+
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { /* handled via resume refresh */ }
+
+    override fun onResume() {
+        super.onResume()
+        biomeCaptureActiveState.value = BiomeCaptureService.isRunning
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,13 +96,31 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MacroAppRoot()
+            MacroAppRoot(
+                captureActive = biomeCaptureActiveState.value,
+                onStartBiomeCapture = {
+                    if (BiomeCaptureService.isRunning) {
+                        biomeCaptureActiveState.value = true
+                    } else {
+                        biomeCaptureLauncher.launch(projectionManager.createScreenCaptureIntent())
+                    }
+                },
+                onStopBiomeCapture = {
+                    BiomeCaptureService.stop(this)
+                    biomeCaptureActiveState.value = false
+                }
+            )
         }
     }
 }
 
 @Composable
-fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
+fun MacroAppRoot(
+    captureActive: Boolean,
+    viewModel: MacroViewModel = viewModel(),
+    onStartBiomeCapture: () -> Unit = {},
+    onStopBiomeCapture: () -> Unit = {}
+) {
     val settings by viewModel.settings.collectAsState()
     val macros by viewModel.macros.collectAsState()
     val permissionStatus by viewModel.permissionStatus.collectAsState()
@@ -84,6 +130,7 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
     val floatingActive by viewModel.floatingActive.collectAsState()
     val editingMacro by viewModel.editingMacro.collectAsState()
     val isAccessibilityConnected by viewModel.isAccessibilityConnected.collectAsState()
+    val pendingBiomeFeedback by viewModel.pendingBiomeFeedback.collectAsState()
 
     var currentTab by remember { mutableStateOf(NavTab.HOME) }
 
@@ -111,6 +158,7 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
                             NavTab.EDITOR -> Icons.Default.Edit
                             NavTab.LIBRARY -> Icons.Default.FolderOpen
                             NavTab.TESTING -> Icons.Default.Science
+                            NavTab.BIOME -> Icons.Default.Palette
                             NavTab.SETTINGS -> Icons.Default.Settings
                         }
                         NavigationBarItem(
@@ -184,6 +232,20 @@ fun MacroAppRoot(viewModel: MacroViewModel = viewModel()) {
                         onExportMacroJson = { viewModel.exportMacroJson(it) },
                         onExportAllJson = { viewModel.exportAllJson() },
                         onImportJson = { raw, cb -> viewModel.importJson(raw, cb) }
+                    )
+
+                    NavTab.BIOME -> BiomeReviewScreen(
+                        captureActive = captureActive,
+                        onStartCapture = {
+                            onStartBiomeCapture()
+                        },
+                        onStopCapture = {
+                            onStopBiomeCapture()
+                        },
+                        pending = pendingBiomeFeedback,
+                        onConfirm = { id, biome -> viewModel.confirmBiomeFeedback(id, biome) },
+                        onDiscard = { viewModel.discardBiomeFeedback(it) },
+                        onRefresh = { viewModel.refreshBiomeFeedback() }
                     )
 
                     NavTab.TESTING -> TestingDashboardScreen(

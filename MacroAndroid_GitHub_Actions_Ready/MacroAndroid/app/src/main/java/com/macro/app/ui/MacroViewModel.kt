@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.macro.app.MacroApplication
+import com.macro.app.biome.BiomeId
+import com.macro.app.data.BiomeFeedbackEntity
 import com.macro.app.engine.MacroEngine
 import com.macro.app.engine.PlaybackTelemetry
 import com.macro.app.engine.SpeedEngine
@@ -25,6 +27,10 @@ class MacroViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as MacroApplication
     private val repository = app.repository
     private val settingsStore = app.settingsDataStore
+    private val biomeFeedbackDao = app.database.biomeFeedbackDao()
+
+    private val _pendingBiomeFeedback = MutableStateFlow<List<BiomeFeedbackEntity>>(emptyList())
+    val pendingBiomeFeedback: StateFlow<List<BiomeFeedbackEntity>> = _pendingBiomeFeedback.asStateFlow()
 
     val macros: StateFlow<List<Macro>> = repository.observeAllMacros()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -48,6 +54,30 @@ class MacroViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _floatingActive = MutableStateFlow(FloatingControlService.isRunning)
     val floatingActive: StateFlow<Boolean> = _floatingActive.asStateFlow()
+
+    init {
+        refreshBiomeFeedback()
+    }
+
+    fun refreshBiomeFeedback() {
+        viewModelScope.launch {
+            _pendingBiomeFeedback.value = biomeFeedbackDao.getPending()
+        }
+    }
+
+    fun confirmBiomeFeedback(id: String, biome: BiomeId) {
+        viewModelScope.launch {
+            biomeFeedbackDao.confirmPending(id, biome.name)
+            _pendingBiomeFeedback.value = biomeFeedbackDao.getPending()
+        }
+    }
+
+    fun discardBiomeFeedback(id: String) {
+        viewModelScope.launch {
+            biomeFeedbackDao.discardPending(id)
+            _pendingBiomeFeedback.value = biomeFeedbackDao.getPending()
+        }
+    }
 
     fun refreshStatus() {
         val ctx = getApplication<Application>()
